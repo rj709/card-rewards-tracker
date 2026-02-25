@@ -1,0 +1,1488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <!-- PWA / iOS web-app -->
+  <link rel="manifest" href="co-manifest.json">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Optimizer">
+  <meta name="theme-color" content="#4f46e5">
+  <title>Card Optimizer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f0f2f5;
+      --surface: #ffffff;
+      --border: #e0e4ea;
+      --text: #1a1d23;
+      --muted: #6b7280;
+      --accent: #4f46e5;
+      --accent-light: #ede9fe;
+      --danger: #ef4444;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --radius: 12px;
+      --shadow: 0 1px 4px rgba(0,0,0,0.07), 0 2px 8px rgba(0,0,0,0.05);
+      --shadow-lg: 0 8px 32px rgba(0,0,0,0.14);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    /* ── Header ──────────────────────────────── */
+    header {
+      background: white;
+      border-bottom: 1px solid var(--border);
+      padding: 0.9rem 1.5rem;
+      padding-top: calc(0.9rem + env(safe-area-inset-top, 0px));
+      padding-left:  calc(1.5rem + env(safe-area-inset-left, 0px));
+      padding-right: calc(1.5rem + env(safe-area-inset-right, 0px));
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      box-shadow: var(--shadow);
+    }
+    .logo { font-size: 1.15rem; font-weight: 700; color: var(--accent); letter-spacing: -0.01em; }
+    .header-actions { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+
+    /* ── Buttons ─────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      padding: 0.5rem 1rem; border-radius: 8px; border: none;
+      cursor: pointer; font-size: 0.875rem; font-weight: 500;
+      font-family: inherit; transition: background 0.12s, opacity 0.12s;
+    }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-primary:hover { background: #4338ca; }
+    .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+    .btn-ghost:hover { background: var(--bg); color: var(--text); }
+    .btn-sm { padding: 0.3rem 0.6rem; font-size: 0.8rem; border-radius: 6px; }
+    .btn-icon-sm {
+      background: transparent; border: none; cursor: pointer; color: var(--muted);
+      border-radius: 5px; width: 28px; height: 28px;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 0.85rem; transition: background 0.12s, color 0.12s;
+    }
+    .btn-icon-sm:hover { background: #fee2e2; color: var(--danger); }
+
+    /* ── Main layout ─────────────────────────── */
+    main {
+      max-width: 1060px; margin: 0 auto;
+      padding: 1.5rem;
+      padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+      padding-left:   calc(1.5rem + env(safe-area-inset-left, 0px));
+      padding-right:  calc(1.5rem + env(safe-area-inset-right, 0px));
+    }
+
+    /* ── Summary strip ───────────────────────── */
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+    .stat { background: white; border-radius: var(--radius); padding: 1rem 1.25rem; box-shadow: var(--shadow); }
+    .stat-label { font-size: 0.75rem; color: var(--muted); margin-bottom: 0.25rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    .stat-value { font-size: 1.6rem; font-weight: 700; line-height: 1; }
+    .stat-value.blue   { color: var(--accent); }
+    .stat-value.green  { color: var(--success); }
+    .stat-value.amber  { color: var(--warning); }
+    .stat-value.purple { color: #9333ea; }
+
+    /* ── Lookup Panel ────────────────────────── */
+    .lookup-panel {
+      background: white;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1.25rem 1.4rem;
+      margin-bottom: 1.5rem;
+    }
+    .lookup-panel h2 {
+      font-size: 0.95rem; font-weight: 600; margin-bottom: 0.85rem; color: var(--text);
+    }
+    .lookup-row {
+      display: flex; gap: 0.75rem; align-items: flex-end;
+    }
+    .lookup-row .fgroup { flex: 1; }
+    .lookup-row select { font-size: 1rem; padding: 0.65rem 0.85rem; }
+
+    .input-prefix {
+      display: flex; align-items: center;
+      border: 1px solid var(--border); border-radius: 8px;
+      background: white; overflow: hidden;
+    }
+    .input-prefix span {
+      padding: 0.65rem 0 0.65rem 0.75rem;
+      color: var(--muted); font-weight: 600; font-size: 1rem;
+      user-select: none;
+    }
+    .input-prefix input {
+      border: none; outline: none; background: none;
+      padding: 0.65rem 0.75rem 0.65rem 0.25rem;
+      font-size: 1rem; width: 100%;
+    }
+
+    .lookup-earning {
+      font-size: 1.1rem; font-weight: 700; color: var(--text);
+      margin-top: 0.4rem; margin-bottom: 0.15rem;
+    }
+
+    .lookup-result {
+      margin-top: 1.1rem;
+      padding: 1.1rem 1.25rem;
+      background: var(--bg);
+      border-radius: 10px;
+      display: none;
+    }
+    .lookup-result.visible { display: block; }
+
+    .lookup-answer {
+      display: flex; align-items: center; gap: 0.75rem;
+      margin-bottom: 0.6rem;
+    }
+    .lookup-card-dot {
+      width: 18px; height: 18px; border-radius: 6px; flex-shrink: 0;
+    }
+    .lookup-card-name {
+      font-size: 1.3rem; font-weight: 700;
+    }
+    .lookup-return-big {
+      font-size: 1.8rem; font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+      margin-bottom: 0.25rem;
+    }
+    .lookup-breakdown {
+      font-size: 0.85rem; color: var(--muted);
+    }
+    .lookup-runner-up {
+      margin-top: 0.75rem;
+      padding-top: 0.75rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.82rem; color: var(--muted);
+    }
+    .lookup-runner-up span { font-weight: 600; color: var(--text); }
+
+    .lookup-empty {
+      color: var(--muted);
+      font-size: 0.9rem;
+      text-align: center;
+      padding: 0.5rem 0;
+    }
+
+    /* ── Category Dashboard Grid ─────────────── */
+    .cat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1rem;
+      align-items: start;
+    }
+
+    .cat-card {
+      background: white;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      cursor: pointer;
+      transition: box-shadow 0.15s;
+    }
+    .cat-card:hover {
+      box-shadow: 0 2px 8px rgba(0,0,0,0.10), 0 4px 16px rgba(0,0,0,0.08);
+    }
+
+    .cat-card-head {
+      padding: 0.85rem 1.1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+
+    .cat-card-left {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      min-width: 0;
+    }
+
+    .cat-color-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .cat-card-name {
+      font-size: 0.9rem;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .cat-best {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      flex-shrink: 0;
+    }
+
+    .cat-best-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .cat-best-name {
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--muted);
+      max-width: 120px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .cat-return-row {
+      padding: 0 1.1rem 0.85rem;
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+    }
+
+    .cat-return-value {
+      font-size: 1.2rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .cat-return-detail {
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    /* Color-coded return quality */
+    .return-excellent { color: #16a34a; }
+    .return-great     { color: #22c55e; }
+    .return-good      { color: #65a30d; }
+    .return-fair      { color: var(--warning); }
+    .return-low       { color: var(--muted); }
+
+    .cat-chevron {
+      font-size: 0.7rem;
+      color: var(--muted);
+      transition: transform 0.2s;
+      flex-shrink: 0;
+    }
+    .cat-card.expanded .cat-chevron {
+      transform: rotate(180deg);
+    }
+
+    /* ── Expanded ranked list ─────────────────── */
+    .cat-ranked {
+      border-top: 1px solid var(--border);
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.25s ease;
+    }
+    .cat-card.expanded .cat-ranked {
+      max-height: 600px;
+    }
+
+    .ranked-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.55rem 1.1rem;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.84rem;
+    }
+    .ranked-item:last-child { border-bottom: none; }
+
+    .ranked-left {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      min-width: 0;
+    }
+
+    .ranked-rank {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--muted);
+      width: 1.5em;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .ranked-card-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .ranked-card-name {
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .ranked-pts-type {
+      font-size: 0.72rem;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .ranked-right {
+      display: flex;
+      align-items: baseline;
+      gap: 0.4rem;
+      flex-shrink: 0;
+    }
+
+    .ranked-return {
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .ranked-detail {
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    .cat-no-cards {
+      padding: 1rem 1.1rem;
+      text-align: center;
+      font-size: 0.84rem;
+      color: var(--muted);
+    }
+
+    /* ── Forms ───────────────────────────────── */
+    .fgroup { display: flex; flex-direction: column; gap: 0.3rem; }
+    label { font-size: 0.8rem; font-weight: 500; color: var(--muted); }
+
+    input[type=text],
+    input[type=number],
+    select {
+      width: 100%;
+      padding: 0.55rem 0.75rem;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.875rem;
+      font-family: inherit;
+      color: var(--text);
+      background: white;
+      transition: border-color 0.12s;
+      appearance: auto;
+    }
+    input:focus, select:focus { outline: none; border-color: var(--accent); }
+    input::placeholder { color: #c4c8d1; }
+
+    /* ── Modals ──────────────────────────────── */
+    .backdrop {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.38); z-index: 100;
+      align-items: center; justify-content: center; padding: 1rem;
+    }
+    .backdrop.open { display: flex; }
+    .modal {
+      background: white; border-radius: var(--radius);
+      width: 100%; max-width: 440px;
+      box-shadow: var(--shadow-lg);
+      display: flex; flex-direction: column; max-height: 90vh;
+    }
+    .modal-head {
+      padding: 1.1rem 1.4rem; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+    }
+    .modal-head h2 { font-size: 1.05rem; }
+    .modal-body { padding: 1.25rem 1.4rem; overflow-y: auto; }
+    .modal-foot {
+      padding: 0.9rem 1.4rem; border-top: 1px solid var(--border);
+      display: flex; justify-content: flex-end; gap: 0.65rem; flex-shrink: 0;
+    }
+
+    /* list items inside modals */
+    .list-swatch { width: 22px; height: 22px; border-radius: 5px; flex-shrink: 0; }
+    .list-name  { font-size: 0.875rem; font-weight: 600; }
+    .list-sub   { font-size: 0.75rem; color: var(--muted); }
+
+    /* color grid */
+    .color-grid { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.4rem; }
+    .swatch {
+      width: 28px; height: 28px; border-radius: 7px; cursor: pointer;
+      border: 3px solid transparent; transition: transform 0.1s, border-color 0.1s; flex-shrink: 0;
+    }
+    .swatch:hover { transform: scale(1.12); }
+    .swatch.active { border-color: #1a1d23; transform: scale(1.12); }
+
+    /* section divider inside modal */
+    .modal-section-head {
+      font-size: 0.82rem; font-weight: 600;
+      margin: 1rem 0 0.6rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+    }
+    .modal-section-head:first-child { border-top: none; margin-top: 0; padding-top: 0; }
+
+    /* ── Card multiplier UI inside Manage Cards modal ── */
+    .cm-card-item {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.65rem 0.75rem;
+      margin-bottom: 0.5rem;
+    }
+    .cm-card-top {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 0.5rem;
+    }
+    .cm-card-top-left { display: flex; align-items: center; gap: 0.6rem; }
+    .cm-mult-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.45rem; }
+    .cm-mult-chip {
+      display: inline-flex; align-items: center; gap: 0.28rem;
+      padding: 0.18rem 0.4rem 0.18rem 0.5rem;
+      border-radius: 6px; font-size: 0.73rem;
+      background: var(--bg); border: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    .cm-mult-chip .cm-cat  { font-weight: 500; }
+    .cm-mult-chip .cm-pts  { font-weight: 700; color: var(--accent); }
+    .cm-mult-remove {
+      background: none; border: none; cursor: pointer; color: var(--muted);
+      font-size: 0.72rem; line-height: 1; padding: 0 0 0 0.05rem;
+      display: inline-flex; align-items: center;
+    }
+    .cm-mult-remove:hover { color: var(--danger); }
+    .cm-no-mults { font-size: 0.78rem; color: var(--muted); margin-bottom: 0.4rem; display: block; }
+    .cm-add-row { display: flex; gap: 0.4rem; align-items: center; }
+    .cm-add-row select { flex: 1.4; font-size: 0.8rem; padding: 0.3rem 0.5rem; height: 30px; border: 1.5px solid var(--border); border-radius: 7px; font-family: inherit; background: white; }
+    .cm-add-row select:focus { outline: none; border-color: var(--accent); }
+    .cm-add-row input  { width: 72px; flex-shrink: 0; font-size: 0.8rem; padding: 0.3rem 0.5rem; height: 30px; border: 1.5px solid var(--border); border-radius: 7px; font-family: inherit; }
+    .cm-add-row input:focus { outline: none; border-color: var(--accent); }
+    .cm-add-btn {
+      padding: 0 0.65rem; border-radius: 6px; border: none; flex-shrink: 0;
+      background: var(--accent); color: white; font-size: 0.78rem;
+      font-weight: 600; cursor: pointer; font-family: inherit; height: 30px;
+    }
+    .cm-add-btn:hover { background: #4338ca; }
+
+    /* base multiplier row */
+    .base-mult-row {
+      display: flex; align-items: center; gap: 0.4rem;
+      margin-bottom: 0.45rem;
+      font-size: 0.78rem; color: var(--muted);
+    }
+    .base-mult-row input {
+      width: 60px; font-size: 0.8rem; padding: 0.25rem 0.5rem; height: 28px;
+      border: 1.5px solid var(--border); border-radius: 7px; font-family: inherit;
+    }
+    .base-mult-row input:focus { outline: none; border-color: var(--accent); }
+
+    /* ── Tagged-card chips inside points type items ── */
+    .pt-list-item {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.65rem 0.75rem;
+      margin-bottom: 0.5rem;
+    }
+    .pt-list-top {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 0.4rem;
+    }
+    .pt-list-top-left { display: flex; align-items: center; gap: 0.6rem; }
+    .pt-cards-row { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.45rem; min-height: 0; }
+    .pt-card-chip {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      padding: 0.2rem 0.5rem 0.2rem 0.4rem;
+      border-radius: 999px; font-size: 0.73rem; font-weight: 600;
+      background: var(--bg); border: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    .pt-card-chip-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .pt-chip-remove {
+      background: none; border: none; cursor: pointer; color: var(--muted);
+      font-size: 0.75rem; line-height: 1; padding: 0 0 0 0.1rem;
+      display: inline-flex; align-items: center;
+    }
+    .pt-chip-remove:hover { color: var(--danger); }
+    .pt-tag-row { display: flex; gap: 0.4rem; }
+    .pt-tag-row select { flex: 1; font-size: 0.8rem; padding: 0.3rem 0.5rem; height: 30px; }
+    .pt-tag-btn {
+      padding: 0.3rem 0.65rem; border-radius: 6px; border: none;
+      background: var(--accent); color: white; font-size: 0.78rem;
+      font-weight: 600; cursor: pointer; white-space: nowrap; font-family: inherit;
+      height: 30px;
+    }
+    .pt-tag-btn:hover { background: #4338ca; }
+    .pt-no-cards { font-size: 0.78rem; color: var(--muted); margin-bottom: 0.4rem; }
+
+    /* valuation row inside points type items */
+    .val-row {
+      display: flex; align-items: center; gap: 0.4rem;
+      margin-bottom: 0.45rem;
+    }
+    .val-row input {
+      width: 72px; font-size: 0.8rem; padding: 0.25rem 0.5rem; height: 28px;
+      border: 1.5px solid var(--border); border-radius: 7px; font-family: inherit;
+    }
+    .val-row input:focus { outline: none; border-color: var(--accent); }
+    .val-label { font-size: 0.75rem; color: var(--muted); }
+
+    /* cash back toggle */
+    .cb-toggle {
+      display: flex; align-items: center; gap: 0.45rem;
+      margin-bottom: 0.45rem; font-size: 0.78rem; color: var(--muted);
+    }
+    .cb-toggle input[type=checkbox] {
+      width: auto; accent-color: var(--accent);
+    }
+    .cb-badge {
+      display: inline-block; padding: 0.1rem 0.4rem; border-radius: 4px;
+      font-size: 0.68rem; font-weight: 600; background: #dcfce7; color: #166534;
+    }
+
+    /* ── Category management modal ───────────── */
+    .cat-list-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.5rem 0.6rem; border: 1px solid var(--border);
+      border-radius: 8px; margin-bottom: 0.4rem;
+    }
+    .cat-list-item.is-editing { border-color: var(--accent); background: #fafbff; flex-direction: column; align-items: stretch; gap: 0.5rem; }
+    .cat-list-left  { display: flex; align-items: center; gap: 0.55rem; }
+    .cat-preview    { display: inline-block; padding: 0.15rem 0.6rem; border-radius: 999px; font-size: 0.78rem; font-weight: 600; white-space: nowrap; }
+    .cat-list-actions { display: flex; gap: 0.25rem; flex-shrink: 0; }
+    .cat-edit-btn {
+      background: transparent; border: none; cursor: pointer; color: var(--muted);
+      border-radius: 5px; width: 26px; height: 26px;
+      display: inline-flex; align-items: center; justify-content: center; font-size: 0.82rem;
+      transition: background 0.1s, color 0.1s;
+    }
+    .cat-edit-btn:hover { background: var(--accent-light); color: var(--accent); }
+    .cat-edit-row { display: flex; gap: 0.5rem; align-items: center; }
+    .cat-edit-row input[type=text] { flex: 1; font-size: 0.85rem; padding: 0.4rem 0.6rem; height: 32px; }
+    .cat-edit-save {
+      padding: 0 0.7rem; height: 32px; border-radius: 6px; border: none;
+      background: var(--accent); color: white; font-size: 0.8rem; font-weight: 600;
+      cursor: pointer; font-family: inherit; flex-shrink: 0;
+    }
+    .cat-edit-save:hover { background: #4338ca; }
+    .cat-edit-cancel {
+      padding: 0 0.6rem; height: 32px; border-radius: 6px;
+      border: 1px solid var(--border); background: white; color: var(--muted);
+      font-size: 0.8rem; cursor: pointer; font-family: inherit; flex-shrink: 0;
+    }
+    .cat-edit-cancel:hover { background: var(--bg); }
+
+    /* ── Mobile adjustments ─────────────────── */
+    @media (max-width: 480px) {
+      .header-actions { gap: 0.35rem; }
+      .ranked-item { flex-wrap: wrap; gap: 0.25rem; }
+      .ranked-right { margin-left: 2em; }
+      .ranked-pts-type { display: none; }
+    }
+
+    /* scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">&#x1F4CA; Card Optimizer</div>
+  <div class="header-actions">
+    <button class="btn btn-ghost btn-sm" onclick="openManageCategories()">Categories</button>
+    <button class="btn btn-ghost btn-sm" onclick="openManagePointsTypes()">Points Types</button>
+    <button class="btn btn-ghost btn-sm" onclick="openManageCards()">Manage Cards</button>
+  </div>
+</header>
+
+<main>
+  <!-- Lookup Panel -->
+  <div class="lookup-panel">
+    <h2>What are you buying?</h2>
+    <div class="lookup-row">
+      <div class="fgroup">
+        <label for="lookupCat">Spending Category</label>
+        <select id="lookupCat" onchange="renderLookup()">
+          <option value="">Choose a category...</option>
+        </select>
+      </div>
+      <div class="fgroup" style="max-width:140px">
+        <label for="lookupAmt">Amount</label>
+        <div class="input-prefix">
+          <span>$</span>
+          <input type="number" id="lookupAmt" placeholder="0.00" min="0" step="0.01"
+                 oninput="renderLookup()" inputmode="decimal">
+        </div>
+      </div>
+    </div>
+    <div class="lookup-result" id="lookupResult"></div>
+  </div>
+
+  <div class="summary" id="summary"></div>
+  <div id="dashboard"></div>
+</main>
+
+<!-- ── Manage Cards Modal ────────────────────────────── -->
+<div class="backdrop" id="cardModal" onclick="backdropClose(event,'cardModal')">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Manage Cards</h2>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('cardModal')">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <div id="cardListEl"></div>
+      <div class="modal-section-head">Add New Card</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:0.5rem">
+        <div class="fgroup">
+          <label>Card Name</label>
+          <input type="text" id="ncName" placeholder="e.g. Sapphire Reserve">
+        </div>
+        <div class="fgroup">
+          <label>Bank / Issuer</label>
+          <input type="text" id="ncBank" placeholder="e.g. Chase">
+        </div>
+      </div>
+      <div class="fgroup" style="margin-bottom:0.5rem">
+        <label>Base Multiplier (default for all categories)</label>
+        <input type="number" id="ncBaseMult" value="1" min="0.25" step="0.25" style="width:100px">
+      </div>
+      <div class="fgroup" style="margin-bottom:0.75rem">
+        <label>Color</label>
+        <div class="color-grid" id="cardColorGrid"></div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="addCard()">Add Card</button>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('cardModal')">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Manage Categories Modal ───────────────────────── -->
+<div class="backdrop" id="catModal" onclick="backdropClose(event,'catModal')">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Categories</h2>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('catModal')">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <div id="catListEl"></div>
+      <div class="modal-section-head">Add Category</div>
+      <div style="display:flex;gap:0.5rem;align-items:flex-end;margin-bottom:0.5rem">
+        <div class="fgroup" style="flex:1">
+          <label>Name</label>
+          <input type="text" id="newCatName" placeholder="e.g. Subscriptions">
+        </div>
+      </div>
+      <div class="fgroup" style="margin-bottom:0.75rem">
+        <label>Color</label>
+        <div class="color-grid" id="catAddColorGrid"></div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="addCategory()">Add Category</button>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('catModal')">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Manage Points Types Modal ─────────────────────── -->
+<div class="backdrop" id="ptsTypeModal" onclick="backdropClose(event,'ptsTypeModal')">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Points Types</h2>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('ptsTypeModal')">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <div id="ptsTypeListEl"></div>
+      <div class="modal-section-head">Add New Points Type</div>
+      <div class="fgroup" style="margin-bottom:0.5rem">
+        <label>Name</label>
+        <input type="text" id="nptName" placeholder="e.g. Chase Ultimate Rewards">
+      </div>
+      <div class="cb-toggle" style="margin-bottom:0.6rem">
+        <input type="checkbox" id="nptCashBack" onchange="toggleValGroup()">
+        <label for="nptCashBack" style="font-size:0.82rem;color:var(--text)">This is a cash back type</label>
+      </div>
+      <div class="fgroup" id="nptValGroup" style="margin-bottom:0.5rem">
+        <label>Valuation (cents per point)</label>
+        <input type="number" id="nptVal" placeholder="1.0" min="0.1" step="0.1" value="1.0">
+      </div>
+      <div class="fgroup" style="margin-bottom:0.75rem">
+        <label>Color</label>
+        <div class="color-grid" id="ptsTypeColorGrid"></div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="addPointsType()">Add Points Type</button>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('ptsTypeModal')">Done</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Constants ────────────────────────────────────────────────────────────────
+const KEY = 'co_v1';
+const PALETTE = [
+  '#0f3460','#16213e','#1e40af','#0369a1',
+  '#0e7490','#134e4a','#065f46','#166534',
+  '#7f1d1d','#9f1239','#be185d','#9d174d',
+  '#4c1d95','#312e81','#6b21a8','#7e22ce',
+  '#92400e','#78350f','#b45309','#a16207',
+  '#374151','#1e293b','#1f2937','#27272a',
+];
+
+const DEFAULT_CATEGORIES = [
+  { name: 'Dining',        color: '#92400e' },
+  { name: 'Groceries',     color: '#166534' },
+  { name: 'Travel',        color: '#1d4ed8' },
+  { name: 'Gas',           color: '#9a3412' },
+  { name: 'Entertainment', color: '#9d174d' },
+  { name: 'Shopping',      color: '#5b21b6' },
+  { name: 'Streaming',     color: '#155e75' },
+  { name: 'Hotels',        color: '#14532d' },
+  { name: 'Airlines',      color: '#1e40af' },
+  { name: 'Other',         color: '#374151' },
+];
+
+// ── State ────────────────────────────────────────────────────────────────────
+let db = { cards: [], purchases: [], pointsTypes: [] };
+let expandedCategories = new Set();
+let activeCardColor    = PALETTE[0];
+let activePtsColor     = PALETTE[4];
+let activeCatColor     = PALETTE[16];
+let activeEditCatColor = PALETTE[16];
+let editingCatName     = null;
+
+// ── Persistence ──────────────────────────────────────────────────────────────
+function load() {
+  try {
+    const r = localStorage.getItem(KEY);
+    if (r) {
+      const parsed = JSON.parse(r);
+      db = { pointsTypes: [], categories: [], ...parsed };
+    }
+    if (!db.categories) db.categories = DEFAULT_CATEGORIES.map(c => ({ ...c }));
+    // Ensure optimizer fields have defaults
+    db.pointsTypes.forEach(pt => {
+      if (pt.valuation === undefined) pt.valuation = 1.0;
+      if (pt.isCashBack === undefined) pt.isCashBack = false;
+    });
+    db.cards.forEach(c => {
+      if (c.baseMultiplier === undefined) c.baseMultiplier = 1;
+    });
+  } catch {}
+}
+function save() { localStorage.setItem(KEY, JSON.stringify(db)); }
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function uid()  { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function getCard(id)    { return db.cards.find(c => c.id === id); }
+function getPtsType(id) { return db.pointsTypes.find(t => t.id === id); }
+
+function hexToLight(hex) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  const mix = v => Math.round(v + (255-v)*0.85);
+  return `rgb(${mix(r)},${mix(g)},${mix(b)})`;
+}
+
+function getCatStyle(name) {
+  const cat = (db.categories || []).find(c => c.name === name);
+  if (!cat) return { bg: '#f3f4f6', fg: '#374151' };
+  return { bg: hexToLight(cat.color), fg: cat.color };
+}
+
+// ── Core Optimizer Logic ─────────────────────────────────────────────────────
+function getMultiplier(card, categoryName) {
+  if (card.multipliers && card.multipliers[categoryName]) {
+    return card.multipliers[categoryName];
+  }
+  return card.baseMultiplier || 1;
+}
+
+function getValuation(card) {
+  if (!card.pointsTypeId) return 0;
+  const pt = getPtsType(card.pointsTypeId);
+  if (!pt) return 0;
+  return pt.valuation || 1.0;
+}
+
+function effectiveReturn(card, categoryName) {
+  return getMultiplier(card, categoryName) * getValuation(card);
+}
+
+function rankCardsForCategory(categoryName) {
+  return db.cards
+    .filter(c => c.pointsTypeId && getPtsType(c.pointsTypeId))
+    .map(card => {
+      const mult = getMultiplier(card, categoryName);
+      const val  = getValuation(card);
+      const pt   = getPtsType(card.pointsTypeId);
+      return { card, multiplier: mult, valuation: val, effectiveReturn: mult * val, pointsType: pt };
+    })
+    .sort((a, b) => b.effectiveReturn - a.effectiveReturn);
+}
+
+function returnClass(cents) {
+  if (cents >= 8) return 'return-excellent';
+  if (cents >= 5) return 'return-great';
+  if (cents >= 3) return 'return-good';
+  if (cents >= 1.5) return 'return-fair';
+  return 'return-low';
+}
+
+// Format earning description based on cash back vs points
+function fmtEarning(r) {
+  if (r.pointsType.isCashBack) {
+    return `${r.multiplier}% cash back`;
+  }
+  return `${r.multiplier}x ${esc(r.pointsType.name)}`;
+}
+
+function fmtEarningShort(r) {
+  if (r.pointsType.isCashBack) return `${r.multiplier}%`;
+  return `${r.multiplier}x`;
+}
+
+// ── Render ───────────────────────────────────────────────────────────────────
+function render() { renderLookupSelect(); renderLookup(); renderSummary(); renderDashboard(); }
+
+function renderLookupSelect() {
+  const sel = document.getElementById('lookupCat');
+  const prev = sel.value;
+  const cats = db.categories || [];
+  sel.innerHTML = '<option value="">Choose a category\u2026</option>' +
+    cats.map(c => `<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('');
+  if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+}
+
+function renderLookup() {
+  const cat = document.getElementById('lookupCat').value;
+  const el = document.getElementById('lookupResult');
+
+  if (!cat) {
+    el.classList.remove('visible');
+    return;
+  }
+
+  const ranked = rankCardsForCategory(cat);
+  el.classList.add('visible');
+
+  if (ranked.length === 0) {
+    el.innerHTML = `<div class="lookup-empty">No cards with points types set up yet.<br>Add cards and assign points types to get recommendations.</div>`;
+    return;
+  }
+
+  const best = ranked[0];
+  const cls = returnClass(best.effectiveReturn);
+  const amt = parseFloat(document.getElementById('lookupAmt').value) || 0;
+
+  let earningHtml = '';
+  if (amt > 0) {
+    if (best.pointsType.isCashBack) {
+      const cb = (amt * best.multiplier / 100);
+      earningHtml = `<div class="lookup-earning">$${cb.toFixed(2)} cash back</div>`;
+    } else {
+      const pts = Math.round(amt * best.multiplier);
+      earningHtml = `<div class="lookup-earning">${pts.toLocaleString()} ${esc(best.pointsType.name)}</div>`;
+    }
+  }
+
+  let runnerUpHtml = '';
+  if (ranked.length > 1) {
+    const others = ranked.slice(1, 4).map(r =>
+      `<span>${esc(r.card.name)}</span> ${fmtEarning(r)}`
+    ).join(' &nbsp;\u00B7&nbsp; ');
+    runnerUpHtml = `<div class="lookup-runner-up">Also: ${others}</div>`;
+  }
+
+  el.innerHTML = `
+    <div class="lookup-answer">
+      <div class="lookup-card-dot" style="background:${best.card.color}"></div>
+      <div class="lookup-card-name">${esc(best.card.name)}</div>
+    </div>
+    <div class="lookup-return-big ${cls}">${fmtEarning(best)}</div>
+    ${earningHtml}
+    <div class="lookup-breakdown">${esc(best.pointsType.name)}</div>
+    ${runnerUpHtml}`;
+}
+
+function renderSummary() {
+  const activeCards = db.cards.filter(c => c.pointsTypeId).length;
+  const totalCats   = (db.categories || []).length;
+  const coveredCats = (db.categories || []).filter(cat =>
+    db.cards.some(c => c.multipliers && c.multipliers[cat.name])
+  ).length;
+
+  document.getElementById('summary').innerHTML = `
+    <div class="stat">
+      <div class="stat-label">Active Cards</div>
+      <div class="stat-value blue">${activeCards}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Categories</div>
+      <div class="stat-value">${coveredCats} / ${totalCats}</div>
+    </div>
+  `;
+}
+
+function renderDashboard() {
+  const el = document.getElementById('dashboard');
+  const cats = db.categories || [];
+
+  if (cats.length === 0) {
+    el.innerHTML = `
+      <div style="text-align:center;padding:4rem 1rem;color:var(--muted)">
+        <div style="font-size:2.5rem;margin-bottom:0.75rem">&#x1F4CA;</div>
+        <h3 style="font-size:1rem;color:var(--text);margin-bottom:0.35rem">No categories yet</h3>
+        <p style="font-size:0.85rem">Add categories and cards to start optimizing.</p>
+      </div>`;
+    return;
+  }
+
+  if (db.cards.length === 0) {
+    el.innerHTML = `
+      <div style="text-align:center;padding:4rem 1rem;color:var(--muted)">
+        <div style="font-size:2.5rem;margin-bottom:0.75rem">&#x1F4B3;</div>
+        <h3 style="font-size:1rem;color:var(--text);margin-bottom:0.35rem">No cards yet</h3>
+        <p style="font-size:0.85rem">Add your credit cards via Manage Cards to get started.</p>
+      </div>`;
+    return;
+  }
+
+  el.innerHTML = `<div class="cat-grid">${cats.map(cat => renderCategoryCard(cat)).join('')}</div>`;
+}
+
+function renderCategoryCard(cat) {
+  const ranked = rankCardsForCategory(cat.name);
+  const isExpanded = expandedCategories.has(cat.name);
+
+  let bestHtml;
+  if (ranked.length === 0) {
+    bestHtml = `<span style="font-size:0.8rem;color:var(--muted)">No cards</span>`;
+  } else {
+    const best = ranked[0];
+    bestHtml = `
+      <div class="cat-best">
+        <span class="cat-best-dot" style="background:${best.card.color}"></span>
+        <span class="cat-best-name">${esc(best.card.name)}</span>
+      </div>`;
+  }
+
+  let returnHtml;
+  if (ranked.length === 0) {
+    returnHtml = `
+      <div class="cat-return-row">
+        <span style="font-size:0.84rem;color:var(--muted)">Assign points types to see recommendations</span>
+      </div>`;
+  } else {
+    const best = ranked[0];
+    const cls = returnClass(best.effectiveReturn);
+    returnHtml = `
+      <div class="cat-return-row">
+        <span class="cat-return-value ${cls}">${fmtEarningShort(best)}</span>
+        <span class="cat-return-detail">${fmtEarning(best)}</span>
+      </div>`;
+  }
+
+  let rankedHtml;
+  if (ranked.length > 0) {
+    rankedHtml = `<div class="cat-ranked">
+      ${ranked.map((r, i) => `
+        <div class="ranked-item">
+          <div class="ranked-left">
+            <span class="ranked-rank">${i + 1}</span>
+            <span class="ranked-card-dot" style="background:${r.card.color}"></span>
+            <span class="ranked-card-name">${esc(r.card.name)}</span>
+            <span class="ranked-pts-type">${esc(r.pointsType.name)}</span>
+          </div>
+          <div class="ranked-right">
+            <span class="ranked-return ${returnClass(r.effectiveReturn)}">${fmtEarningShort(r)}</span>
+            <span class="ranked-detail">${fmtEarning(r)}</span>
+          </div>
+        </div>`).join('')}
+    </div>`;
+  } else {
+    rankedHtml = `<div class="cat-ranked">
+      <div class="cat-no-cards">Assign points types to your cards to see rankings.</div>
+    </div>`;
+  }
+
+  return `
+    <div class="cat-card ${isExpanded ? 'expanded' : ''}" onclick="toggleCategory('${esc(cat.name)}')">
+      <div class="cat-card-head">
+        <div class="cat-card-left">
+          <span class="cat-color-dot" style="background:${cat.color}"></span>
+          <span class="cat-card-name">${esc(cat.name)}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.5rem">
+          ${bestHtml}
+          <span class="cat-chevron">&#x25BC;</span>
+        </div>
+      </div>
+      ${returnHtml}
+      ${rankedHtml}
+    </div>`;
+}
+
+function toggleCategory(name) {
+  if (expandedCategories.has(name)) expandedCategories.delete(name);
+  else expandedCategories.add(name);
+  renderDashboard();
+}
+
+// ── Modal helpers ────────────────────────────────────────────────────────────
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function backdropClose(e, id) { if (e.target === e.currentTarget) closeModal(id); }
+
+// ── Manage Cards ─────────────────────────────────────────────────────────────
+function openManageCards() {
+  renderColorGrid('cardColorGrid', activeCardColor, 'card');
+  renderCardList();
+  openModal('cardModal');
+  setTimeout(() => document.getElementById('ncName').focus(), 50);
+}
+
+function renderCardList() {
+  const el = document.getElementById('cardListEl');
+  if (db.cards.length === 0) {
+    el.innerHTML = '<div style="font-size:0.85rem;color:var(--muted);padding-bottom:0.5rem">No cards yet. Add one below.</div>';
+    return;
+  }
+  el.innerHTML = db.cards.map(c => {
+    const mults = c.multipliers || {};
+    const entries = Object.entries(mults);
+    const allCatNames = (db.categories || []).map(c => c.name);
+    const remaining = allCatNames.filter(cat => !(cat in mults));
+
+    const chipsHtml = entries.length === 0
+      ? `<span class="cm-no-mults">No category multipliers set</span>`
+      : `<div class="cm-mult-chips">${entries.map(([cat, val]) => {
+          const col = getCatStyle(cat);
+          return `<span class="cm-mult-chip">
+            <span class="cm-cat" style="color:${col.fg}">${esc(cat)}</span>
+            <span class="cm-pts">${val}x</span>
+            <button class="cm-mult-remove" onclick="event.stopPropagation();removeCardMultiplier('${c.id}','${esc(cat)}')" title="Remove">&#x2715;</button>
+          </span>`;
+        }).join('')}</div>`;
+
+    const addRowHtml = remaining.length === 0
+      ? `<div style="font-size:0.75rem;color:var(--muted)">All categories configured</div>`
+      : `<div class="cm-add-row">
+          <select id="cmCat_${c.id}" onclick="event.stopPropagation()">
+            <option value="">Category\u2026</option>
+            ${remaining.map(cat => `<option value="${esc(cat)}">${esc(cat)}</option>`).join('')}
+          </select>
+          <input type="number" id="cmMult_${c.id}" placeholder="pts/$" min="0.25" step="0.25" onclick="event.stopPropagation()">
+          <button class="cm-add-btn" onclick="event.stopPropagation();addCardMultiplier('${c.id}')">Add</button>
+        </div>`;
+
+    const baseMult = c.baseMultiplier || 1;
+
+    return `
+      <div class="cm-card-item">
+        <div class="cm-card-top">
+          <div class="cm-card-top-left">
+            <div class="list-swatch" style="background:${c.color}"></div>
+            <div>
+              <div class="list-name">${esc(c.name)}</div>
+              ${c.bank ? `<div class="list-sub">${esc(c.bank)}</div>` : ''}
+            </div>
+          </div>
+          <button class="btn-icon-sm" onclick="deleteCard('${c.id}')" title="Delete">&#x1F5D1;</button>
+        </div>
+        <div class="base-mult-row">
+          <span>Base:</span>
+          <input type="number" value="${baseMult}" min="0.25" step="0.25"
+                 onclick="event.stopPropagation()"
+                 onchange="onBaseMultChange('${c.id}', this.value)">
+          <span>x (all other categories)</span>
+        </div>
+        ${chipsHtml}
+        ${addRowHtml}
+      </div>`;
+  }).join('');
+}
+
+function addCard() {
+  const name = document.getElementById('ncName').value.trim();
+  const bank = document.getElementById('ncBank').value.trim();
+  const baseMult = parseFloat(document.getElementById('ncBaseMult').value) || 1;
+  if (!name) { flashRed('ncName'); return; }
+  db.cards.push({ id: uid(), name, bank, color: activeCardColor, multipliers: {}, baseMultiplier: baseMult });
+  document.getElementById('ncName').value = '';
+  document.getElementById('ncBank').value = '';
+  document.getElementById('ncBaseMult').value = '1';
+  save(); renderCardList(); render();
+}
+
+function deleteCard(id) {
+  if (!confirm('Delete this card?')) return;
+  db.cards = db.cards.filter(c => c.id !== id);
+  save(); renderCardList(); render();
+}
+
+function addCardMultiplier(cardId) {
+  const cat  = document.getElementById('cmCat_'  + cardId)?.value;
+  const mult = parseFloat(document.getElementById('cmMult_' + cardId)?.value);
+  if (!cat)              { flashRed('cmCat_'  + cardId); return; }
+  if (!mult || mult <= 0){ flashRed('cmMult_' + cardId); return; }
+  const card = getCard(cardId);
+  if (!card) return;
+  if (!card.multipliers) card.multipliers = {};
+  card.multipliers[cat] = mult;
+  save(); renderCardList(); render();
+}
+
+function removeCardMultiplier(cardId, cat) {
+  const card = getCard(cardId);
+  if (!card || !card.multipliers) return;
+  delete card.multipliers[cat];
+  save(); renderCardList(); render();
+}
+
+function onBaseMultChange(cardId, value) {
+  const card = getCard(cardId);
+  if (!card) return;
+  const val = parseFloat(value);
+  card.baseMultiplier = (val && val > 0) ? val : 1;
+  save(); render();
+}
+
+// ── Manage Points Types ──────────────────────────────────────────────────────
+function openManagePointsTypes() {
+  renderColorGrid('ptsTypeColorGrid', activePtsColor, 'pts');
+  renderPtsTypeList();
+  openModal('ptsTypeModal');
+  setTimeout(() => document.getElementById('nptName').focus(), 50);
+}
+
+function renderPtsTypeList() {
+  const el = document.getElementById('ptsTypeListEl');
+  if (db.pointsTypes.length === 0) {
+    el.innerHTML = '<div style="font-size:0.85rem;color:var(--muted);padding-bottom:0.5rem">No points types yet. Add one below.</div>';
+    return;
+  }
+  el.innerHTML = db.pointsTypes.map(t => {
+    const tagged = db.cards.filter(c => c.pointsTypeId === t.id);
+    const untagged = db.cards.filter(c => !c.pointsTypeId);
+
+    const chipHtml = tagged.length === 0
+      ? `<div class="pt-no-cards">No cards tagged yet</div>`
+      : `<div class="pt-cards-row">${tagged.map(c => `
+          <span class="pt-card-chip">
+            <span class="pt-card-chip-dot" style="background:${c.color}"></span>
+            ${esc(c.name)}
+            <button class="pt-chip-remove" onclick="untagCard('${c.id}')" title="Remove">&#x2715;</button>
+          </span>`).join('')}
+        </div>`;
+
+    const tagRowHtml = untagged.length === 0
+      ? `<div style="font-size:0.75rem;color:var(--muted)">All cards are tagged</div>`
+      : `<div class="pt-tag-row">
+          <select id="tagSel_${t.id}">
+            <option value="">Select a card\u2026</option>
+            ${untagged.map(c => `<option value="${c.id}">${esc(c.name)}${c.bank?' ('+esc(c.bank)+')':''}</option>`).join('')}
+          </select>
+          <button class="pt-tag-btn" onclick="tagCard('${t.id}')">Tag</button>
+        </div>`;
+
+    const typeBadge = t.isCashBack
+      ? `<span class="cb-badge">Cash Back</span>`
+      : '';
+
+    const valRowHtml = t.isCashBack
+      ? `<div class="cb-toggle">
+           <input type="checkbox" checked onchange="toggleCashBack('${t.id}', false)">
+           <span>Cash back type</span>
+         </div>`
+      : `<div class="cb-toggle">
+           <input type="checkbox" onchange="toggleCashBack('${t.id}', true)">
+           <span>Cash back type</span>
+         </div>
+         <div class="val-row">
+           <input type="number" value="${t.valuation || 1}" min="0.1" step="0.1"
+                  onchange="onValuationChange('${t.id}', this.value)">
+           <span class="val-label">\u00A2 per point</span>
+         </div>`;
+
+    return `
+      <div class="pt-list-item">
+        <div class="pt-list-top">
+          <div class="pt-list-top-left">
+            <div class="list-swatch" style="background:${t.color}"></div>
+            <div class="list-name">${esc(t.name)}</div>
+            ${typeBadge}
+          </div>
+          <button class="btn-icon-sm" onclick="deletePointsType('${t.id}')" title="Delete">&#x1F5D1;</button>
+        </div>
+        ${valRowHtml}
+        ${chipHtml}
+        ${tagRowHtml}
+      </div>`;
+  }).join('');
+}
+
+function addPointsType() {
+  const name = document.getElementById('nptName').value.trim();
+  const isCB = document.getElementById('nptCashBack').checked;
+  const val  = isCB ? 1.0 : (parseFloat(document.getElementById('nptVal').value) || 1.0);
+  if (!name) { flashRed('nptName'); return; }
+  db.pointsTypes.push({ id: uid(), name, color: activePtsColor, valuation: val, isCashBack: isCB });
+  document.getElementById('nptName').value = '';
+  document.getElementById('nptVal').value = '1.0';
+  document.getElementById('nptCashBack').checked = false;
+  toggleValGroup();
+  save(); renderPtsTypeList(); render();
+}
+
+function toggleValGroup() {
+  const isCB = document.getElementById('nptCashBack').checked;
+  document.getElementById('nptValGroup').style.display = isCB ? 'none' : '';
+}
+
+function deletePointsType(id) {
+  if (!confirm('Delete this points type?')) return;
+  db.pointsTypes = db.pointsTypes.filter(t => t.id !== id);
+  db.cards.forEach(c => { if (c.pointsTypeId === id) c.pointsTypeId = null; });
+  save(); renderPtsTypeList(); render();
+}
+
+function onValuationChange(ptId, value) {
+  const pt = getPtsType(ptId);
+  if (!pt) return;
+  const val = parseFloat(value);
+  pt.valuation = (val && val > 0) ? val : 1.0;
+  save(); render();
+}
+
+function toggleCashBack(ptId, isCB) {
+  const pt = getPtsType(ptId);
+  if (!pt) return;
+  pt.isCashBack = isCB;
+  if (isCB) pt.valuation = 1.0;
+  save(); renderPtsTypeList(); render();
+}
+
+function tagCard(ptsTypeId) {
+  const sel = document.getElementById('tagSel_' + ptsTypeId);
+  const cardId = sel ? sel.value : '';
+  if (!cardId) return;
+  const card = getCard(cardId);
+  if (!card) return;
+  card.pointsTypeId = ptsTypeId;
+  save(); renderPtsTypeList(); render();
+}
+
+function untagCard(cardId) {
+  const card = getCard(cardId);
+  if (!card) return;
+  card.pointsTypeId = null;
+  save(); renderPtsTypeList(); render();
+}
+
+// ── Manage Categories ────────────────────────────────────────────────────────
+function openManageCategories() {
+  editingCatName = null;
+  renderColorGrid('catAddColorGrid', activeCatColor, 'catAdd');
+  renderCategoryList();
+  openModal('catModal');
+  setTimeout(() => document.getElementById('newCatName').focus(), 50);
+}
+
+function renderCategoryList() {
+  const el = document.getElementById('catListEl');
+  if (!db.categories || db.categories.length === 0) {
+    el.innerHTML = '<div style="font-size:0.85rem;color:var(--muted);padding-bottom:0.5rem">No categories yet. Add one below.</div>';
+    return;
+  }
+  el.innerHTML = db.categories.map(cat => {
+    const style = getCatStyle(cat.name);
+
+    if (editingCatName === cat.name) {
+      return `
+        <div class="cat-list-item is-editing">
+          <div class="cat-edit-row">
+            <input type="text" id="editCatName" value="${esc(cat.name)}"
+                   onkeydown="if(event.key==='Enter')saveEditCategory('${esc(cat.name)}');
+                              if(event.key==='Escape')cancelEditCategory();">
+            <button class="cat-edit-save"   onclick="saveEditCategory('${esc(cat.name)}')">Save</button>
+            <button class="cat-edit-cancel" onclick="cancelEditCategory()">Cancel</button>
+          </div>
+          <div class="fgroup" style="margin-top:0.35rem">
+            <label style="font-size:0.75rem">Color</label>
+            <div class="color-grid" id="catEditColorGrid"></div>
+          </div>
+        </div>`;
+    }
+
+    return `
+      <div class="cat-list-item">
+        <div class="cat-list-left">
+          <span class="cat-preview" style="background:${style.bg};color:${style.fg}">${esc(cat.name)}</span>
+        </div>
+        <div class="cat-list-actions">
+          <button class="cat-edit-btn" onclick="startEditCategory('${esc(cat.name)}')" title="Edit">&#x270F;&#xFE0F;</button>
+          <button class="cat-edit-btn" onclick="deleteCategory('${esc(cat.name)}')" title="Delete"
+                  style="border-radius:5px;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;font-size:0.82rem;background:transparent;border:none;cursor:pointer;color:var(--muted);transition:background 0.1s,color 0.1s;"
+                  onmouseover="this.style.background='#fee2e2';this.style.color='var(--danger)'"
+                  onmouseout="this.style.background='transparent';this.style.color='var(--muted)'">&#x1F5D1;</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  if (editingCatName) {
+    const cat = db.categories.find(c => c.name === editingCatName);
+    if (cat) renderColorGrid('catEditColorGrid', cat.color, 'catEdit');
+  }
+}
+
+function startEditCategory(name) {
+  editingCatName = name;
+  const cat = db.categories.find(c => c.name === name);
+  if (cat) activeEditCatColor = cat.color;
+  renderCategoryList();
+  setTimeout(() => {
+    const inp = document.getElementById('editCatName');
+    if (inp) { inp.focus(); inp.select(); }
+  }, 30);
+}
+
+function cancelEditCategory() {
+  editingCatName = null;
+  renderCategoryList();
+}
+
+function saveEditCategory(oldName) {
+  const newName = (document.getElementById('editCatName')?.value || '').trim();
+  if (!newName) { flashRed('editCatName'); return; }
+
+  if (newName !== oldName && db.categories.some(c => c.name === newName)) {
+    alert(`A category named "${newName}" already exists.`);
+    return;
+  }
+
+  const cat = db.categories.find(c => c.name === oldName);
+  if (!cat) return;
+
+  cat.name  = newName;
+  cat.color = activeEditCatColor;
+
+  if (newName !== oldName) {
+    (db.purchases || []).forEach(p => { if (p.category === oldName) p.category = newName; });
+    db.cards.forEach(c => {
+      if (c.multipliers && oldName in c.multipliers) {
+        c.multipliers[newName] = c.multipliers[oldName];
+        delete c.multipliers[oldName];
+      }
+    });
+  }
+
+  editingCatName = null;
+  save();
+  renderCategoryList();
+  render();
+}
+
+function addCategory() {
+  const name = document.getElementById('newCatName').value.trim();
+  if (!name) { flashRed('newCatName'); return; }
+  if (db.categories.some(c => c.name === name)) {
+    alert(`A category named "${name}" already exists.`);
+    return;
+  }
+  db.categories.push({ name, color: activeCatColor });
+  document.getElementById('newCatName').value = '';
+  save();
+  renderCategoryList();
+  render();
+}
+
+function deleteCategory(name) {
+  if (!confirm(`Delete category "${name}"?`)) return;
+  db.categories = db.categories.filter(c => c.name !== name);
+  db.cards.forEach(c => {
+    if (c.multipliers && name in c.multipliers) delete c.multipliers[name];
+  });
+  save();
+  renderCategoryList();
+  render();
+}
+
+// ── Color picker ─────────────────────────────────────────────────────────────
+function renderColorGrid(gridId, selected, ctx) {
+  if (ctx === 'card')    activeCardColor    = selected || PALETTE[0];
+  if (ctx === 'pts')     activePtsColor     = selected || PALETTE[4];
+  if (ctx === 'catAdd')  activeCatColor     = selected || PALETTE[16];
+  if (ctx === 'catEdit') activeEditCatColor = selected || PALETTE[16];
+  const cur = ctx === 'pts'     ? activePtsColor
+            : ctx === 'catAdd'  ? activeCatColor
+            : ctx === 'catEdit' ? activeEditCatColor
+            : activeCardColor;
+  document.getElementById(gridId).innerHTML = PALETTE.map(c => `
+    <div class="swatch ${c === cur ? 'active' : ''}"
+         data-color="${c}" data-ctx="${ctx}" style="background:${c}"
+         onclick="pickColor('${c}','${ctx}','${gridId}')"></div>`).join('');
+}
+
+function pickColor(c, ctx, gridId) {
+  if (ctx === 'card')    activeCardColor    = c;
+  if (ctx === 'pts')     activePtsColor     = c;
+  if (ctx === 'catAdd')  activeCatColor     = c;
+  if (ctx === 'catEdit') activeEditCatColor = c;
+  document.querySelectorAll(`#${gridId} .swatch`).forEach(el =>
+    el.classList.toggle('active', el.dataset.color === c));
+}
+
+function flashRed(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.borderColor = 'var(--danger)';
+  el.focus();
+  setTimeout(() => el.style.borderColor = '', 1200);
+}
+
+// ── Keyboard shortcuts ───────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && ['ncName','ncBank'].includes(document.activeElement.id)) addCard();
+  if (e.key === 'Enter' && document.activeElement.id === 'nptName') addPointsType();
+  if (e.key === 'Enter' && document.activeElement.id === 'newCatName') addCategory();
+  if (e.key === 'Escape') ['cardModal','ptsTypeModal','catModal'].forEach(id => closeModal(id));
+});
+
+// ── Boot ─────────────────────────────────────────────────────────────────────
+load();
+render();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () =>
+    navigator.serviceWorker.register('co-sw.js').catch(() => {})
+  );
+}
+</script>
+</body>
+</html>
