@@ -214,6 +214,15 @@
     .credit-name { font-size: 0.875rem; font-weight: 600; }
     .credit-right { display: flex; align-items: center; gap: 0.35rem; flex-shrink: 0; }
 
+    .credit-item.skipped { opacity: 0.38; }
+    .credit-item.skipped .progress-fill { background: #9ca3af !important; }
+    .btn-skip { font-size: 0.75rem; line-height: 1; padding: 0.18rem 0.35rem; border-radius: 4px;
+                border: 1px solid var(--border); background: transparent; cursor: pointer;
+                color: var(--text-muted); transition: background 0.15s, color 0.15s; }
+    .btn-skip:hover { background: var(--border); color: var(--text); }
+    .credit-item.skipped .btn-skip { background: #fef2f2; border-color: #fca5a5; color: #ef4444; }
+    .credit-item.skipped .btn-skip:hover { background: #fee2e2; }
+
     .badge {
       font-size: 0.7rem;
       font-weight: 600;
@@ -659,6 +668,15 @@ function periodUsages(cr) {
 function usedAmt(cr)  { return (cr.usages || []).reduce((s, u) => s + u.amount, 0); }
 function leftAmt(cr)  { return Math.max(0, cr.amount - usedAmt(cr)); }
 
+function toggleSkip(cardId, crId) {
+  const card = db.cards.find(c => c.id === cardId);
+  if (!card) return;
+  const cr = (card.credits || []).find(c => c.id === crId);
+  if (!cr) return;
+  cr.skipped = !cr.skipped;
+  saveDb(); render();
+}
+
 function barColor(pct) {
   if (pct >= 0.999) return '#22c55e';
   if (pct >= 0.65)  return '#f59e0b';
@@ -670,8 +688,9 @@ function render() { renderSummary(); renderGrid(); }
 
 function renderSummary() {
   const cards    = db.cards.length;
-  const total    = db.cards.flatMap(c=>c.credits).reduce((s,c)=>s+c.amount, 0);
-  const used     = db.cards.flatMap(c=>c.credits).reduce((s,c)=>s+usedAmt(c), 0);
+  const allCr    = db.cards.flatMap(c=>c.credits).filter(c=>!c.skipped);
+  const total    = allCr.reduce((s,c)=>s+c.amount, 0);
+  const used     = allCr.reduce((s,c)=>s+usedAmt(c), 0);
   const left     = total - used;
   const fees     = db.cards.reduce((s,c)=>s+(c.annualFee||0), 0);
   const netVal   = used - fees;
@@ -747,7 +766,7 @@ function renderCredits(card) {
     };
     const [typeLabel, badgeCls] = TYPE_META[cr.type] || TYPE_META['annual'];
     return `
-      <div class="credit-item"
+      <div class="credit-item${cr.skipped ? ' skipped' : ''}"
            data-cr-id="${cr.id}"
            draggable="true"
            ondragstart="onCrDragStart(event,'${card.id}','${cr.id}')"
@@ -767,6 +786,7 @@ function renderCredits(card) {
           </div>
           <div class="credit-right">
             <span class="badge ${badgeCls}">${typeLabel}</span>
+            <button class="btn-skip" onclick="toggleSkip('${card.id}','${cr.id}')" title="${cr.skipped ? 'Re-enable credit' : 'Mark as skipped'}">${cr.skipped ? '↩ Enable' : '✕ Skip'}</button>
             <button class="btn-icon-sm" onclick="openCrModal('${card.id}','${cr.id}')" title="Edit">&#x270F;&#xFE0F;</button>
             <button class="btn-icon-sm" onclick="deleteCr('${card.id}','${cr.id}')" title="Delete">&#x1F5D1;&#xFE0F;</button>
           </div>
@@ -787,7 +807,7 @@ function renderCredits(card) {
 
 function renderValueBar(card) {
   const fee    = card.annualFee || 0;
-  const used   = (card.credits || []).reduce((s, cr) => s + usedAmt(cr), 0);
+  const used   = (card.credits || []).filter(cr => !cr.skipped).reduce((s, cr) => s + usedAmt(cr), 0);
   const net    = used - fee;
   const cls    = net >= 0 ? 'pos' : 'neg';
   return `
