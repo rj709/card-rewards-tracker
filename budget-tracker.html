@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Budget Tracker</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="bt-manifest.json">
+  <link rel="apple-touch-icon" href="icons/bt-apple-touch-icon.png">
+  <meta name="theme-color" content="#4f46e5">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Budget">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f0f2f5;
+      --surface: #ffffff;
+      --border: #e0e4ea;
+      --text: #1a1d23;
+      --muted: #6b7280;
+      --accent: #4f46e5;
+      --accent-light: #ede9fe;
+      --danger: #ef4444;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --radius: 12px;
+      --shadow: 0 1px 4px rgba(0,0,0,0.07), 0 2px 8px rgba(0,0,0,0.05);
+      --shadow-lg: 0 8px 32px rgba(0,0,0,0.14);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    /* ── Header ─────────────────────────────────── */
+    header {
+      background: white;
+      border-bottom: 1px solid var(--border);
+      padding: calc(0.9rem + env(safe-area-inset-top, 0px)) 1.5rem 0.9rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      box-shadow: var(--shadow);
+    }
+
+    .logo {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: -0.01em;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    /* ── Buttons ─────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      font-family: inherit;
+      transition: background 0.12s, opacity 0.12s;
+    }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-primary:hover { background: #4338ca; }
+    .btn-ghost { background: transparent; color: var(--muted); }
+    .btn-ghost:hover { background: var(--bg); color: var(--text); }
+    .btn-sm { padding: 0.3rem 0.6rem; font-size: 0.8rem; border-radius: 6px; }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-danger:hover { background: #dc2626; }
+    .btn-icon-sm {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      color: var(--muted);
+      border-radius: 5px;
+      width: 24px; height: 24px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      transition: background 0.12s, color 0.12s;
+    }
+    .btn-icon-sm:hover { background: var(--bg); color: var(--danger); }
+
+    /* ── Main layout ─────────────────────────────── */
+    main {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 1.5rem;
+    }
+
+    /* ── Summary strip ───────────────────────────── */
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .stat {
+      background: white;
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      box-shadow: var(--shadow);
+    }
+    .stat-label { font-size: 0.78rem; color: var(--muted); margin-bottom: 0.2rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    .stat-value { font-size: 1.55rem; font-weight: 700; line-height: 1; }
+    .stat-value.blue   { color: var(--accent); }
+    .stat-value.green  { color: var(--success); }
+    .stat-value.amber  { color: var(--warning); }
+    .stat-value.red    { color: var(--danger); }
+
+    /* ── Tabs ────────────────────────────────────── */
+    .tabs {
+      display: flex;
+      gap: 0.25rem;
+      margin-bottom: 1.5rem;
+      background: white;
+      border-radius: var(--radius);
+      padding: 0.35rem;
+      box-shadow: var(--shadow);
+    }
+    .tab {
+      flex: 1;
+      padding: 0.6rem 1rem;
+      text-align: center;
+      border: none;
+      background: transparent;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      font-family: inherit;
+      color: var(--muted);
+      transition: all 0.15s;
+    }
+    .tab.active {
+      background: var(--accent);
+      color: white;
+    }
+    .tab:not(.active):hover {
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    /* ── Month navigation ───────────────────────── */
+    .month-nav {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .month-nav-btn {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      width: 36px; height: 36px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      transition: all 0.12s;
+      color: var(--text);
+    }
+    .month-nav-btn:hover { background: var(--accent-light); border-color: var(--accent); }
+    .month-label {
+      font-size: 1.15rem;
+      font-weight: 700;
+      min-width: 180px;
+      text-align: center;
+    }
+
+    /* ── Cards panel ─────────────────────────────── */
+    .panel {
+      background: white;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .panel-head {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .panel-head h2 { font-size: 1rem; }
+
+    /* ── Bills table ─────────────────────────────── */
+    .table-wrap {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+    th {
+      background: #f8f9fc;
+      padding: 0.65rem 1rem;
+      text-align: left;
+      font-weight: 600;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      white-space: nowrap;
+      border-bottom: 1px solid var(--border);
+    }
+    th.r, td.r { text-align: right; }
+    td {
+      padding: 0.65rem 1rem;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafbff; }
+
+    .color-dot {
+      display: inline-block;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      margin-right: 0.5rem;
+      vertical-align: middle;
+      flex-shrink: 0;
+    }
+
+    .bill-name-cell {
+      display: flex;
+      align-items: center;
+      gap: 0.15rem;
+    }
+
+    /* ── Running tally ───────────────────────────── */
+    .tally-row { transition: background 0.1s; }
+    .tally-row:hover td { background: #fafbff; }
+    .tally-row.is-payday td { background: #f0fdf4; }
+    .tally-row.is-payday:hover td { background: #dcfce7; }
+    .tally-payday { color: var(--success); font-weight: 600; }
+    .tally-bill { color: var(--danger); }
+    .tally-balance { font-weight: 700; }
+    .tally-balance.positive { color: var(--success); }
+    .tally-balance.negative { color: var(--danger); }
+
+    .day-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: var(--bg);
+      font-weight: 600;
+      font-size: 0.82rem;
+      flex-shrink: 0;
+    }
+    .is-payday .day-badge {
+      background: var(--success);
+      color: white;
+    }
+
+    /* ── Empty state ─────────────────────────────── */
+    .empty-state {
+      text-align: center;
+      padding: 4rem 1rem;
+      color: var(--muted);
+    }
+    .empty-icon { font-size: 3rem; margin-bottom: 1rem; }
+    .empty-state h2 { font-size: 1.2rem; color: var(--text); margin-bottom: 0.4rem; }
+    .empty-state p  { font-size: 0.9rem; margin-bottom: 1.5rem; }
+
+    /* ── Modals ──────────────────────────────────── */
+    .backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.38);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .backdrop.open { display: flex; }
+
+    .modal {
+      background: white;
+      border-radius: var(--radius);
+      width: 100%;
+      max-width: 460px;
+      box-shadow: var(--shadow-lg);
+      display: flex;
+      flex-direction: column;
+      max-height: 90vh;
+    }
+
+    .modal-head {
+      padding: 1.1rem 1.4rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .modal-head h2 { font-size: 1.05rem; }
+
+    .modal-body {
+      padding: 1.25rem 1.4rem;
+      overflow-y: auto;
+    }
+
+    .modal-foot {
+      padding: 0.9rem 1.4rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.65rem;
+      flex-shrink: 0;
+    }
+
+    /* ── Forms ───────────────────────────────────── */
+    .fgroup { margin-bottom: 1rem; }
+    .fgroup:last-child { margin-bottom: 0; }
+    .frow { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+
+    label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 500;
+      margin-bottom: 0.3rem;
+      color: var(--text);
+    }
+
+    input[type=text],
+    input[type=number],
+    input[type=date],
+    select {
+      width: 100%;
+      padding: 0.55rem 0.75rem;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.875rem;
+      font-family: inherit;
+      color: var(--text);
+      background: white;
+      transition: border-color 0.12s;
+      appearance: auto;
+    }
+    input:focus, select:focus { outline: none; border-color: var(--accent); }
+
+    /* ── Color swatches ──────────────────────────── */
+    .color-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.4rem;
+    }
+    .swatch {
+      width: 28px; height: 28px;
+      border-radius: 6px;
+      cursor: pointer;
+      border: 3px solid transparent;
+      transition: transform 0.12s, border-color 0.12s;
+      flex-shrink: 0;
+    }
+    .swatch:hover  { transform: scale(1.12); }
+    .swatch.active { border-color: #1a1d23; transform: scale(1.12); }
+
+    /* ── Section heading ─────────────────────────── */
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+    .section-head h2 {
+      font-size: 1.05rem;
+      font-weight: 700;
+    }
+
+    /* ── Scrollbar ───────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
+
+    /* ── Responsive ──────────────────────────────── */
+    @media (max-width: 600px) {
+      header {
+        padding-left: 1rem; padding-right: 1rem;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+      .header-actions { justify-content: flex-end; width: 100%; }
+      main { padding: 1rem; }
+      .summary { grid-template-columns: repeat(2, 1fr); }
+      .frow { grid-template-columns: 1fr; }
+      th, td { padding: 0.5rem 0.65rem; font-size: 0.8rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">&#x1F4B0; Budget Tracker</div>
+  <div class="header-actions">
+    <button class="btn btn-ghost btn-sm" onclick="exportData()" title="Export data">&#x1F4E4; Export</button>
+    <button class="btn btn-ghost btn-sm" onclick="document.getElementById('importFile').click()" title="Import data">&#x1F4E5; Import</button>
+    <button class="btn btn-ghost btn-sm" onclick="openIncomeModal()">&#x2699;&#xFE0F; Income</button>
+    <button class="btn btn-primary" onclick="openBillModal()">+ Add Bill</button>
+  </div>
+</header>
+<input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(this)">
+
+<main>
+  <div class="summary" id="summary"></div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="tally" onclick="switchTab('tally')">Monthly Tally</button>
+    <button class="tab" data-tab="bills" onclick="switchTab('bills')">All Bills</button>
+  </div>
+
+  <!-- Tally view -->
+  <div id="tallyView">
+    <div class="month-nav">
+      <button class="month-nav-btn" onclick="changeMonth(-1)">&#x25C0;</button>
+      <div class="month-label" id="monthLabel"></div>
+      <button class="month-nav-btn" onclick="changeMonth(1)">&#x25B6;</button>
+    </div>
+    <div class="panel">
+      <div class="table-wrap" id="tallyTable"></div>
+    </div>
+  </div>
+
+  <!-- Bills list view -->
+  <div id="billsView" style="display:none">
+    <div class="panel">
+      <div class="table-wrap" id="billsTable"></div>
+    </div>
+  </div>
+</main>
+
+<!-- ── Bill Modal ────────────────────────────────────────────────────────────── -->
+<div class="backdrop" id="billModal" onclick="backdropClose(event,'billModal')">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="billModalTitle">Add Bill</h2>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('billModal')">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <div class="fgroup">
+        <label>Bill Name</label>
+        <input type="text" id="bName" placeholder="e.g. Chase Sapphire">
+      </div>
+      <div class="frow">
+        <div class="fgroup">
+          <label>Amount ($)</label>
+          <input type="number" id="bAmount" placeholder="0.00" min="0.01" step="0.01">
+        </div>
+        <div class="fgroup">
+          <label>Due Day of Month</label>
+          <input type="number" id="bDueDay" placeholder="1" min="1" max="31" step="1">
+        </div>
+      </div>
+      <div class="frow">
+        <div class="fgroup">
+          <label>Statement Cut Day <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+          <input type="number" id="bCutDay" placeholder="—" min="1" max="31" step="1">
+        </div>
+        <div class="fgroup">
+          <label>Category</label>
+          <select id="bCategory">
+            <option value="Credit Card">Credit Card</option>
+            <option value="Loan">Loan</option>
+            <option value="Subscription">Subscription</option>
+            <option value="Utility">Utility</option>
+            <option value="Insurance">Insurance</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+      </div>
+      <div class="fgroup">
+        <label>Color</label>
+        <div class="color-grid" id="colorGrid"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('billModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveBill()">Save Bill</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Income Modal ─────────────────────────────────────────────────────────── -->
+<div class="backdrop" id="incomeModal" onclick="backdropClose(event,'incomeModal')">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Income Setup</h2>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('incomeModal')">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <div class="fgroup">
+        <label>Pay Amount (per paycheck, after tax)</label>
+        <input type="number" id="iAmount" placeholder="0.00" min="0.01" step="0.01">
+      </div>
+      <div class="fgroup">
+        <label>Pay Frequency</label>
+        <select id="iFrequency">
+          <option value="biweekly">Every 2 Weeks</option>
+          <option value="semimonthly">Twice a Month (1st &amp; 15th)</option>
+          <option value="monthly">Monthly</option>
+          <option value="weekly">Weekly</option>
+        </select>
+      </div>
+      <div class="fgroup" id="payDayGroup">
+        <label id="payDayLabel">Next Pay Date</label>
+        <input type="date" id="iPayDate">
+      </div>
+      <div class="fgroup" id="monthlyDayGroup" style="display:none">
+        <label>Pay Day of Month</label>
+        <input type="number" id="iMonthlyDay" placeholder="1" min="1" max="28" step="1" value="1">
+      </div>
+      <div class="fgroup" id="startingBalanceGroup">
+        <label>Starting Balance ($) <span style="font-weight:400;color:var(--muted)">(current cash on hand)</span></label>
+        <input type="number" id="iStartBal" placeholder="0.00" step="0.01">
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('incomeModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveIncome()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Override Modal (edit amount for specific month) ───────────────────────── -->
+<div class="backdrop" id="overrideModal" onclick="backdropClose(event,'overrideModal')">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="overrideModalTitle">Edit Amount</h2>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('overrideModal')">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <div class="fgroup">
+        <label id="overrideLabel">Amount for this month</label>
+        <input type="number" id="oAmount" placeholder="0.00" min="0" step="0.01">
+      </div>
+      <p style="font-size:0.8rem;color:var(--muted);margin-top:0.5rem" id="overrideHint">Leave at 0 to skip this bill for the month. This only affects the selected month.</p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" id="overrideResetBtn" onclick="resetOverride()" style="margin-right:auto">Reset to Default</button>
+      <button class="btn btn-ghost" onclick="closeModal('overrideModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveOverride()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Constants ───────────────────────────────────────────────────────────────
+const KEY = 'bt_v1';
+const PALETTE = [
+  '#0f3460','#16213e','#1e40af','#0369a1',
+  '#0e7490','#164e63','#134e4a','#0f766e',
+  '#065f46','#166534','#1b4332','#3f6212',
+  '#7f1d1d','#9f1239','#be185d','#701a75',
+  '#4c1d95','#312e81','#581c87','#6b21a8',
+  '#7b2d00','#7c2d12','#92400e','#78350f',
+  '#b45309','#a16207','#854d0e','#713f12',
+  '#1a1a2e','#1e293b','#374151','#334155',
+];
+const MONTHS = ['January','February','March','April','May','June',
+                'July','August','September','October','November','December'];
+
+// ── State ───────────────────────────────────────────────────────────────────
+let db = {
+  bills: [],
+  income: {
+    amount: 0,
+    frequency: 'biweekly',
+    nextPayDate: '',
+    monthlyDay: 1,
+    startingBalance: 0
+  },
+  overrides: {} // key: "billId:YYYY-MM" → amount
+};
+
+let editBillId = null;
+let activeColor = PALETTE[0];
+let currentYear  = new Date().getFullYear();
+let currentMonth = new Date().getMonth(); // 0-indexed
+let activeTab = 'tally';
+let overrideCtx = null; // { billId, monthKey }
+
+// ── Persistence ─────────────────────────────────────────────────────────────
+function loadDb() {
+  try {
+    const r = localStorage.getItem(KEY);
+    if (r) db = JSON.parse(r);
+  } catch {}
+  // migrations
+  if (!db.bills) db.bills = [];
+  if (!db.income) db.income = { amount: 0, frequency: 'biweekly', nextPayDate: '', monthlyDay: 1, startingBalance: 0 };
+  if (db.income.startingBalance == null) db.income.startingBalance = 0;
+  if (!db.overrides) db.overrides = {};
+  db.bills.forEach(b => {
+    if (!b.category) b.category = 'Other';
+    if (!b.color) b.color = PALETTE[0];
+  });
+}
+function saveDb() { localStorage.setItem(KEY, JSON.stringify(db)); }
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+function uid()  { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+function fmt(n) { return (n < 0 ? '-$' : '$') + Math.abs(+n).toFixed(2); }
+function fmtC(n){ return (n < 0 ? '-$' : '$') + Math.abs(+n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function esc(s) {
+  return String(s||'')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function monthKey(y, m) { return `${y}-${String(m+1).padStart(2,'0')}`; }
+function ordinal(n) {
+  const s = ['th','st','nd','rd'];
+  const v = n % 100;
+  return n + (s[(v-20)%10] || s[v] || s[0]);
+}
+
+// ── Get bill amount for a specific month (with override support) ────────────
+function billAmountForMonth(bill, y, m) {
+  const key = `${bill.id}:${monthKey(y, m)}`;
+  if (db.overrides[key] != null) return db.overrides[key];
+  return bill.amount;
+}
+
+// ── Pay dates for a given month ─────────────────────────────────────────────
+function getPayDatesForMonth(y, m) {
+  const inc = db.income;
+  if (!inc.amount || inc.amount <= 0) return [];
+
+  const freq = inc.frequency;
+  const monthStart = new Date(y, m, 1);
+  const monthEnd   = new Date(y, m + 1, 0); // last day
+
+  if (freq === 'semimonthly') {
+    return [new Date(y, m, 1), new Date(y, m, 15)];
+  }
+
+  if (freq === 'monthly') {
+    const day = Math.min(inc.monthlyDay || 1, monthEnd.getDate());
+    return [new Date(y, m, day)];
+  }
+
+  // biweekly or weekly
+  const interval = freq === 'weekly' ? 7 : 14;
+  if (!inc.nextPayDate) return [];
+
+  const anchor = new Date(inc.nextPayDate + 'T00:00:00');
+  if (isNaN(anchor.getTime())) return [];
+
+  const dates = [];
+
+  // Walk forward from anchor
+  let d = new Date(anchor);
+  while (d <= monthEnd) {
+    if (d >= monthStart && d <= monthEnd) {
+      dates.push(new Date(d));
+    }
+    d.setDate(d.getDate() + interval);
+  }
+
+  // Walk backward from anchor
+  d = new Date(anchor);
+  d.setDate(d.getDate() - interval);
+  while (d >= monthStart) {
+    if (d <= monthEnd) {
+      dates.push(new Date(d));
+    }
+    d.setDate(d.getDate() - interval);
+  }
+
+  dates.sort((a, b) => a - b);
+  // Deduplicate
+  const seen = new Set();
+  return dates.filter(dt => {
+    const k = dt.toISOString().slice(0, 10);
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
+// ── Build the running tally for a month ─────────────────────────────────────
+function buildTally(y, m) {
+  const events = [];
+
+  // Add bill events
+  db.bills.forEach(bill => {
+    const amt = billAmountForMonth(bill, y, m);
+    if (amt <= 0) return;
+    const lastDay = new Date(y, m + 1, 0).getDate();
+    const day = Math.min(bill.dueDay, lastDay);
+    events.push({
+      day,
+      type: 'bill',
+      name: bill.name,
+      amount: -amt,
+      color: bill.color,
+      billId: bill.id
+    });
+  });
+
+  // Add pay events
+  const payDates = getPayDatesForMonth(y, m);
+  payDates.forEach(pd => {
+    events.push({
+      day: pd.getDate(),
+      type: 'payday',
+      name: 'Payday',
+      amount: db.income.amount,
+      color: null,
+      billId: null
+    });
+  });
+
+  // Sort by day, then paydays before bills on same day
+  events.sort((a, b) => {
+    if (a.day !== b.day) return a.day - b.day;
+    if (a.type === 'payday' && b.type !== 'payday') return -1;
+    if (a.type !== 'payday' && b.type === 'payday') return 1;
+    return 0;
+  });
+
+  // Compute running balance
+  let balance = db.income.startingBalance || 0;
+
+  // Add income and subtract bills from all prior months (simple projection)
+  // We calculate from the start of the data year through the current month
+  const dataStartYear = currentYear;
+  const dataStartMonth = 0; // January of the current display year
+
+  // For simplicity, the "starting balance" represents balance at the start of whatever month is shown
+  // Actually, let's compute the running tally across months from Jan of the year
+  balance = computeBalanceAtStartOfMonth(y, m);
+
+  const rows = [];
+  events.forEach(ev => {
+    balance += ev.amount;
+    rows.push({ ...ev, balance });
+  });
+
+  return rows;
+}
+
+function computeBalanceAtStartOfMonth(y, m) {
+  let bal = db.income.startingBalance || 0;
+
+  // We'll define "starting balance" as balance at the start of January of the year
+  // Then accumulate from Jan through (m-1)
+  const startYear = y;
+  const startMonth = 0; // January
+
+  for (let mm = startMonth; mm < m; mm++) {
+    // Add income
+    const payDates = getPayDatesForMonth(y, mm);
+    bal += payDates.length * (db.income.amount || 0);
+
+    // Subtract bills
+    db.bills.forEach(bill => {
+      const amt = billAmountForMonth(bill, y, mm);
+      if (amt > 0) bal -= amt;
+    });
+  }
+
+  return bal;
+}
+
+// ── Render ──────────────────────────────────────────────────────────────────
+function render() {
+  renderSummary();
+  renderTally();
+  renderBills();
+}
+
+function renderSummary() {
+  const mk = monthKey(currentYear, currentMonth);
+  const totalBills = db.bills.reduce((s, b) => s + billAmountForMonth(b, currentYear, currentMonth), 0);
+  const payDates = getPayDatesForMonth(currentYear, currentMonth);
+  const totalIncome = payDates.length * (db.income.amount || 0);
+  const netFlow = totalIncome - totalBills;
+  const tally = buildTally(currentYear, currentMonth);
+  const endBal = tally.length > 0 ? tally[tally.length - 1].balance : (db.income.startingBalance || 0);
+
+  document.getElementById('summary').innerHTML = `
+    <div class="stat"><div class="stat-label">Bills</div><div class="stat-value blue">${db.bills.length}</div></div>
+    <div class="stat"><div class="stat-label">Monthly Bills</div><div class="stat-value red">${fmtC(totalBills)}</div></div>
+    <div class="stat"><div class="stat-label">Monthly Income</div><div class="stat-value green">${fmtC(totalIncome)}</div></div>
+    <div class="stat"><div class="stat-label">Net Cash Flow</div><div class="stat-value ${netFlow >= 0 ? 'green' : 'red'}">${fmtC(netFlow)}</div></div>
+    <div class="stat"><div class="stat-label">End of Month Bal.</div><div class="stat-value ${endBal >= 0 ? 'green' : 'red'}">${fmtC(endBal)}</div></div>
+  `;
+}
+
+function renderTally() {
+  const rows = buildTally(currentYear, currentMonth);
+  document.getElementById('monthLabel').textContent = `${MONTHS[currentMonth]} ${currentYear}`;
+
+  if (rows.length === 0) {
+    document.getElementById('tallyTable').innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">&#x1F4C5;</div>
+        <h2>No events this month</h2>
+        <p>Add bills and set up your income to see the running tally.</p>
+      </div>`;
+    return;
+  }
+
+  let html = `<table>
+    <thead><tr>
+      <th>Day</th>
+      <th>Description</th>
+      <th class="r">Amount</th>
+      <th class="r">Balance</th>
+      <th></th>
+    </tr></thead><tbody>`;
+
+  // Show starting balance row
+  const startBal = computeBalanceAtStartOfMonth(currentYear, currentMonth);
+  html += `<tr class="tally-row" style="background:#f8f9fc">
+    <td></td>
+    <td style="font-weight:600;color:var(--muted)">Starting Balance</td>
+    <td class="r"></td>
+    <td class="r"><span class="tally-balance ${startBal >= 0 ? 'positive' : 'negative'}">${fmtC(startBal)}</span></td>
+    <td></td>
+  </tr>`;
+
+  rows.forEach(row => {
+    const isPayday = row.type === 'payday';
+    const amtClass = isPayday ? 'tally-payday' : 'tally-bill';
+    const mk = monthKey(currentYear, currentMonth);
+    const editBtn = row.billId
+      ? `<button class="btn-icon-sm" onclick="openOverrideModal('${row.billId}','${mk}')" title="Edit amount for this month">&#x270F;&#xFE0F;</button>`
+      : '';
+
+    html += `<tr class="tally-row ${isPayday ? 'is-payday' : ''}">
+      <td><span class="day-badge">${row.day}</span></td>
+      <td>
+        <span class="bill-name-cell">
+          ${row.color ? `<span class="color-dot" style="background:${row.color}"></span>` : ''}
+          ${esc(row.name)}
+        </span>
+      </td>
+      <td class="r"><span class="${amtClass}">${fmtC(row.amount)}</span></td>
+      <td class="r"><span class="tally-balance ${row.balance >= 0 ? 'positive' : 'negative'}">${fmtC(row.balance)}</span></td>
+      <td>${editBtn}</td>
+    </tr>`;
+  });
+
+  html += `</tbody></table>`;
+  document.getElementById('tallyTable').innerHTML = html;
+}
+
+function renderBills() {
+  if (db.bills.length === 0) {
+    document.getElementById('billsTable').innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">&#x1F4CB;</div>
+        <h2>No bills yet</h2>
+        <p>Add your first bill to start tracking your budget.</p>
+        <button class="btn btn-primary" onclick="openBillModal()">+ Add Bill</button>
+      </div>`;
+    return;
+  }
+
+  const sorted = [...db.bills].sort((a, b) => a.dueDay - b.dueDay);
+
+  let html = `<table>
+    <thead><tr>
+      <th>Bill</th>
+      <th>Category</th>
+      <th class="r">Due Day</th>
+      <th class="r">Cut Day</th>
+      <th class="r">Amount</th>
+      <th></th>
+    </tr></thead><tbody>`;
+
+  sorted.forEach(b => {
+    html += `<tr>
+      <td>
+        <span class="bill-name-cell">
+          <span class="color-dot" style="background:${b.color}"></span>
+          ${esc(b.name)}
+        </span>
+      </td>
+      <td style="color:var(--muted)">${esc(b.category)}</td>
+      <td class="r">${ordinal(b.dueDay)}</td>
+      <td class="r">${b.cutDay ? ordinal(b.cutDay) : '—'}</td>
+      <td class="r" style="font-weight:600">${fmtC(b.amount)}</td>
+      <td style="white-space:nowrap">
+        <button class="btn-icon-sm" onclick="openBillModal('${b.id}')" title="Edit">&#x270F;&#xFE0F;</button>
+        <button class="btn-icon-sm" onclick="deleteBill('${b.id}')" title="Delete">&#x1F5D1;&#xFE0F;</button>
+      </td>
+    </tr>`;
+  });
+
+  html += `</tbody></table>`;
+  document.getElementById('billsTable').innerHTML = html;
+}
+
+// ── Tab switching ───────────────────────────────────────────────────────────
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.getElementById('tallyView').style.display = tab === 'tally' ? '' : 'none';
+  document.getElementById('billsView').style.display  = tab === 'bills'  ? '' : 'none';
+}
+
+// ── Month navigation ────────────────────────────────────────────────────────
+function changeMonth(delta) {
+  currentMonth += delta;
+  if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+  if (currentMonth < 0)  { currentMonth = 11; currentYear--; }
+  render();
+}
+
+// ── Color picker ────────────────────────────────────────────────────────────
+function renderColors(selected) {
+  activeColor = selected || PALETTE[0];
+  document.getElementById('colorGrid').innerHTML = PALETTE.map(c => `
+    <div class="swatch ${c === activeColor ? 'active' : ''}"
+         data-color="${c}"
+         style="background:${c}"
+         onclick="pickColor('${c}')"></div>
+  `).join('');
+}
+function pickColor(c) {
+  activeColor = c;
+  document.querySelectorAll('.swatch').forEach(el => {
+    el.classList.toggle('active', el.dataset.color === c);
+  });
+}
+
+// ── Modal helpers ───────────────────────────────────────────────────────────
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function backdropClose(e, id) { if (e.target === e.currentTarget) closeModal(id); }
+
+// ── Bill CRUD ───────────────────────────────────────────────────────────────
+function openBillModal(id) {
+  editBillId = id || null;
+  const bill = id ? db.bills.find(b => b.id === id) : null;
+  document.getElementById('billModalTitle').textContent = bill ? 'Edit Bill' : 'Add Bill';
+  document.getElementById('bName').value     = bill ? bill.name : '';
+  document.getElementById('bAmount').value   = bill ? bill.amount : '';
+  document.getElementById('bDueDay').value   = bill ? bill.dueDay : '';
+  document.getElementById('bCutDay').value   = bill ? (bill.cutDay || '') : '';
+  document.getElementById('bCategory').value = bill ? bill.category : 'Credit Card';
+  renderColors(bill ? bill.color : PALETTE[0]);
+  openModal('billModal');
+  setTimeout(() => document.getElementById('bName').focus(), 50);
+}
+
+function saveBill() {
+  const name     = document.getElementById('bName').value.trim();
+  const amount   = parseFloat(document.getElementById('bAmount').value);
+  const dueDay   = parseInt(document.getElementById('bDueDay').value);
+  const cutDay   = parseInt(document.getElementById('bCutDay').value) || null;
+  const category = document.getElementById('bCategory').value;
+
+  if (!name) { alert('Bill name is required.'); return; }
+  if (!amount || amount <= 0) { alert('Enter a valid amount.'); return; }
+  if (!dueDay || dueDay < 1 || dueDay > 31) { alert('Enter a valid due day (1-31).'); return; }
+
+  if (editBillId) {
+    const bill    = db.bills.find(b => b.id === editBillId);
+    bill.name     = name;
+    bill.amount   = amount;
+    bill.dueDay   = dueDay;
+    bill.cutDay   = cutDay;
+    bill.category = category;
+    bill.color    = activeColor;
+  } else {
+    db.bills.push({ id: uid(), name, amount, dueDay, cutDay, category, color: activeColor });
+  }
+  saveDb(); render(); closeModal('billModal');
+}
+
+function deleteBill(id) {
+  if (!confirm('Delete this bill?')) return;
+  db.bills = db.bills.filter(b => b.id !== id);
+  // Clean up overrides for this bill
+  Object.keys(db.overrides).forEach(k => {
+    if (k.startsWith(id + ':')) delete db.overrides[k];
+  });
+  saveDb(); render();
+}
+
+// ── Income setup ────────────────────────────────────────────────────────────
+function openIncomeModal() {
+  const inc = db.income;
+  document.getElementById('iAmount').value    = inc.amount || '';
+  document.getElementById('iFrequency').value = inc.frequency || 'biweekly';
+  document.getElementById('iPayDate').value   = inc.nextPayDate || '';
+  document.getElementById('iMonthlyDay').value = inc.monthlyDay || 1;
+  document.getElementById('iStartBal').value  = inc.startingBalance || '';
+  onFrequencyChange();
+  openModal('incomeModal');
+  setTimeout(() => document.getElementById('iAmount').focus(), 50);
+}
+
+function onFrequencyChange() {
+  const freq = document.getElementById('iFrequency').value;
+  const needsAnchor = freq === 'biweekly' || freq === 'weekly';
+  const isMonthly = freq === 'monthly';
+  document.getElementById('payDayGroup').style.display = needsAnchor ? '' : 'none';
+  document.getElementById('monthlyDayGroup').style.display = isMonthly ? '' : 'none';
+}
+document.getElementById('iFrequency').addEventListener('change', onFrequencyChange);
+
+function saveIncome() {
+  const amount    = parseFloat(document.getElementById('iAmount').value) || 0;
+  const frequency = document.getElementById('iFrequency').value;
+  const nextPayDate = document.getElementById('iPayDate').value;
+  const monthlyDay  = parseInt(document.getElementById('iMonthlyDay').value) || 1;
+  const startBal    = parseFloat(document.getElementById('iStartBal').value) || 0;
+
+  db.income = { amount, frequency, nextPayDate, monthlyDay, startingBalance: startBal };
+  saveDb(); render(); closeModal('incomeModal');
+}
+
+// ── Override (per-month bill amount) ────────────────────────────────────────
+function openOverrideModal(billId, mk) {
+  const bill = db.bills.find(b => b.id === billId);
+  if (!bill) return;
+  overrideCtx = { billId, monthKey: mk };
+  const overrideKey = `${billId}:${mk}`;
+  const currentAmt = db.overrides[overrideKey] != null ? db.overrides[overrideKey] : bill.amount;
+
+  document.getElementById('overrideModalTitle').textContent = `Edit — ${bill.name}`;
+  document.getElementById('overrideLabel').textContent = `Amount for ${MONTHS[currentMonth]} ${currentYear}`;
+  document.getElementById('oAmount').value = currentAmt;
+  document.getElementById('overrideResetBtn').style.display = db.overrides[overrideKey] != null ? '' : 'none';
+  openModal('overrideModal');
+  setTimeout(() => document.getElementById('oAmount').focus(), 50);
+}
+
+function saveOverride() {
+  if (!overrideCtx) return;
+  const amt = parseFloat(document.getElementById('oAmount').value) || 0;
+  db.overrides[`${overrideCtx.billId}:${overrideCtx.monthKey}`] = amt;
+  saveDb(); render(); closeModal('overrideModal');
+}
+
+function resetOverride() {
+  if (!overrideCtx) return;
+  delete db.overrides[`${overrideCtx.billId}:${overrideCtx.monthKey}`];
+  saveDb(); render(); closeModal('overrideModal');
+}
+
+// ── Export / Import ─────────────────────────────────────────────────────────
+function exportData() {
+  const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const date = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `budget-tracker-backup-${date}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importData(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!Array.isArray(data.bills)) {
+        alert('Invalid file — expected Budget Tracker data with bills.');
+        return;
+      }
+      if (!confirm('This will replace all current data. Continue?')) return;
+      localStorage.setItem(KEY, JSON.stringify(data));
+      location.reload();
+    } catch (err) {
+      alert('Could not read file: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  input.value = '';
+}
+
+// ── Boot ────────────────────────────────────────────────────────────────────
+loadDb();
+render();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('bt-sw.js'));
+}
+</script>
+</body>
+</html>
