@@ -369,6 +369,23 @@
       font-weight: 600; cursor: pointer; font-family: inherit; height: 30px;
     }
     .cm-add-btn:hover { background: #4338ca; }
+    .cm-base-row {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.35rem 0; margin-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .cm-base-label { font-size: 0.78rem; font-weight: 600; color: var(--muted); white-space: nowrap; flex: 1; }
+    .cm-base-row input {
+      width: 72px; flex-shrink: 0; font-size: 0.8rem; padding: 0.3rem 0.5rem;
+      height: 30px; border: 1.5px solid var(--border); border-radius: 7px; font-family: inherit;
+    }
+    .cm-base-row input:focus { outline: none; border-color: var(--accent); }
+    .cm-base-btn {
+      padding: 0 0.6rem; border-radius: 6px; border: none; flex-shrink: 0;
+      background: var(--accent); color: white; font-size: 0.78rem;
+      font-weight: 600; cursor: pointer; font-family: inherit; height: 30px;
+    }
+    .cm-base-btn:hover { background: #4338ca; }
 
     /* ── Tagged-card chips inside points type items ── */
     .pt-list-item {
@@ -701,6 +718,8 @@ function load() {
     }
     // migrate: ensure categories exists (first load or upgrade from older data)
     if (!db.categories) db.categories = DEFAULT_CATEGORIES.map(c => ({ ...c }));
+    // migrate: ensure cards have baseMultiplier
+    db.cards.forEach(c => { if (c.baseMultiplier == null) c.baseMultiplier = 1; });
   } catch {}
 }
 function save() { localStorage.setItem(KEY, JSON.stringify(db)); }
@@ -1085,6 +1104,7 @@ function renderCardList() {
           <button class="cm-add-btn" onclick="addCardMultiplier('${c.id}')">Add</button>
         </div>`;
 
+    const base = c.baseMultiplier ?? 1;
     return `
       <div class="cm-card-item">
         <div class="cm-card-top">
@@ -1097,6 +1117,12 @@ function renderCardList() {
           </div>
           <button class="btn-icon-sm" onclick="deleteCard('${c.id}')" title="Delete">&#x1F5D1;</button>
         </div>
+        <div class="cm-base-row">
+          <span class="cm-base-label">Base (all other categories)</span>
+          <input type="number" id="cmBase_${c.id}" value="${base}" min="0.25" step="0.25"
+                 onkeydown="if(event.key==='Enter')setBaseMultiplier('${c.id}')">
+          <button class="cm-base-btn" onclick="setBaseMultiplier('${c.id}')">Set</button>
+        </div>
         ${chipsHtml}
         ${addRowHtml}
       </div>`;
@@ -1107,7 +1133,7 @@ function addCard() {
   const name = document.getElementById('ncName').value.trim();
   const bank = document.getElementById('ncBank').value.trim();
   if (!name) { flashRed('ncName'); return; }
-  db.cards.push({ id: uid(), name, bank, color: activeCardColor, multipliers: {} });
+  db.cards.push({ id: uid(), name, bank, color: activeCardColor, baseMultiplier: 1, multipliers: {} });
   document.getElementById('ncName').value = '';
   document.getElementById('ncBank').value = '';
   save(); renderCardList(); renderSelects(); renderSummary();
@@ -1141,14 +1167,28 @@ function removeCardMultiplier(cardId, cat) {
   save(); renderCardList();
 }
 
+function setBaseMultiplier(cardId) {
+  const input = document.getElementById('cmBase_' + cardId);
+  const val   = parseFloat(input?.value);
+  if (!val || val <= 0) { flashRed('cmBase_' + cardId); return; }
+  const card = getCard(cardId);
+  if (!card) return;
+  card.baseMultiplier = val;
+  save();
+  // Flash the input green briefly to confirm
+  input.style.borderColor = 'var(--success)';
+  setTimeout(() => input.style.borderColor = '', 1000);
+}
+
 // Auto-fill multiplier when card + category are both selected
 function autoFillMultiplier() {
   const cardId = document.getElementById('pCard').value;
   const cat    = document.getElementById('pCat').value;
   const card   = getCard(cardId);
-  if (!card || !cat) return;
-  const val = card.multipliers?.[cat];
-  if (val) document.getElementById('pMult').value = val;
+  if (!card) return;
+  // Category-specific multiplier takes priority; fall back to card base rate
+  const val = card.multipliers?.[cat] ?? card.baseMultiplier ?? 1;
+  document.getElementById('pMult').value = val;
 }
 
 // ── Manage Points Types ───────────────────────────────────────────────────────
