@@ -1,0 +1,1450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <!-- PWA / iOS web-app -->
+  <link rel="manifest" href="pts-manifest.json">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Points">
+  <meta name="theme-color" content="#4f46e5">
+  <title>Points Tracker</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f0f2f5;
+      --surface: #ffffff;
+      --border: #e0e4ea;
+      --text: #1a1d23;
+      --muted: #6b7280;
+      --accent: #4f46e5;
+      --accent-light: #ede9fe;
+      --danger: #ef4444;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --radius: 12px;
+      --shadow: 0 1px 4px rgba(0,0,0,0.07), 0 2px 8px rgba(0,0,0,0.05);
+      --shadow-lg: 0 8px 32px rgba(0,0,0,0.14);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    /* ── Header ──────────────────────────────── */
+    header {
+      background: white;
+      border-bottom: 1px solid var(--border);
+      padding: 0.9rem 1.5rem;
+      /* Push content below translucent status bar on iOS */
+      padding-top: calc(0.9rem + env(safe-area-inset-top, 0px));
+      padding-left:  calc(1.5rem + env(safe-area-inset-left, 0px));
+      padding-right: calc(1.5rem + env(safe-area-inset-right, 0px));
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      box-shadow: var(--shadow);
+    }
+    .logo { font-size: 1.15rem; font-weight: 700; color: var(--accent); letter-spacing: -0.01em; }
+    .header-actions { display: flex; gap: 0.5rem; align-items: center; }
+
+    /* ── Buttons ─────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      padding: 0.5rem 1rem; border-radius: 8px; border: none;
+      cursor: pointer; font-size: 0.875rem; font-weight: 500;
+      font-family: inherit; transition: background 0.12s, opacity 0.12s;
+    }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-primary:hover { background: #4338ca; }
+    .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+    .btn-ghost:hover { background: var(--bg); color: var(--text); }
+    .btn-sm { padding: 0.3rem 0.6rem; font-size: 0.8rem; border-radius: 6px; }
+    .btn-icon-sm {
+      background: transparent; border: none; cursor: pointer; color: var(--muted);
+      border-radius: 5px; width: 28px; height: 28px;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 0.85rem; transition: background 0.12s, color 0.12s;
+    }
+    .btn-icon-sm:hover { background: #fee2e2; color: var(--danger); }
+
+    /* ── Main layout ─────────────────────────── */
+    main {
+      max-width: 1060px; margin: 0 auto;
+      padding: 1.5rem;
+      /* Respect iPhone home-indicator and side notches */
+      padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+      padding-left:   calc(1.5rem + env(safe-area-inset-left, 0px));
+      padding-right:  calc(1.5rem + env(safe-area-inset-right, 0px));
+    }
+
+    /* ── Summary strip ───────────────────────── */
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    .stat { background: white; border-radius: var(--radius); padding: 1rem 1.25rem; box-shadow: var(--shadow); }
+    .stat-label { font-size: 0.75rem; color: var(--muted); margin-bottom: 0.25rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    .stat-value { font-size: 1.6rem; font-weight: 700; line-height: 1; }
+    .stat-value.blue   { color: var(--accent); }
+    .stat-value.green  { color: var(--success); }
+    .stat-value.amber  { color: var(--warning); }
+    .stat-value.purple { color: #9333ea; }
+
+    /* ── Points breakdown panel ──────────────── */
+    .breakdown-panel {
+      background: white;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      margin-bottom: 1.25rem;
+    }
+    .breakdown-head {
+      padding: 0.65rem 1.1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      background: #f8f9fc;
+    }
+    .breakdown-head span {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+    .breakdown-table { width: 100%; border-collapse: collapse; }
+    .breakdown-table td {
+      padding: 0.55rem 1.1rem;
+      font-size: 0.845rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .breakdown-table tr:last-child td { border-bottom: none; }
+    .breakdown-table td:nth-child(2),
+    .breakdown-table td:nth-child(3),
+    .breakdown-table td:nth-child(4) { text-align: right; }
+    .breakdown-type-cell { display: flex; align-items: center; gap: 0.5rem; }
+    .type-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+    .breakdown-pts { font-weight: 700; color: var(--accent); }
+
+    /* ── Add Purchase Panel ───────────────────── */
+    .add-panel {
+      background: white;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1.25rem 1.4rem;
+      margin-bottom: 1.5rem;
+    }
+    .add-panel h2 { font-size: 0.95rem; font-weight: 600; margin-bottom: 1rem; color: var(--text); }
+
+    .fgrid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr) auto;
+      gap: 0.75rem;
+      align-items: end;
+    }
+    .fgrid .full-row { grid-column: 1 / -1; }
+
+    @media (max-width: 760px) {
+      .fgrid { grid-template-columns: 1fr 1fr; }
+      .fgrid .full-row { grid-column: 1 / -1; }
+    }
+
+    .fgroup { display: flex; flex-direction: column; gap: 0.3rem; }
+    label { font-size: 0.8rem; font-weight: 500; color: var(--muted); }
+
+    input[type=text],
+    input[type=number],
+    input[type=date],
+    select {
+      width: 100%;
+      padding: 0.55rem 0.75rem;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.875rem;
+      font-family: inherit;
+      color: var(--text);
+      background: white;
+      transition: border-color 0.12s;
+      appearance: auto;
+    }
+    input:focus, select:focus { outline: none; border-color: var(--accent); }
+    input::placeholder { color: #c4c8d1; }
+
+    /* ── Filters ─────────────────────────────── */
+    .filters {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+    .filter-label { font-size: 0.8rem; color: var(--muted); font-weight: 500; }
+    .filter-select {
+      padding: 0.35rem 0.6rem;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-family: inherit;
+      color: var(--text);
+      background: white;
+      cursor: pointer;
+    }
+    .filter-select:focus { outline: none; border-color: var(--accent); }
+    .filter-spacer { flex: 1; }
+
+    /* ── Table ───────────────────────────────── */
+    .table-wrap {
+      background: white;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow-x: auto;
+    }
+
+    table { width: 100%; border-collapse: collapse; }
+
+    thead th {
+      text-align: left;
+      padding: 0.7rem 1rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      background: #f8f9fc;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+    }
+    thead th:hover { color: var(--accent); }
+    thead th .sort-icon { opacity: 0.4; margin-left: 0.25rem; font-size: 0.7rem; }
+    thead th.sort-asc .sort-icon::after  { content: ' ▲'; opacity: 1; }
+    thead th.sort-desc .sort-icon::after { content: ' ▼'; opacity: 1; }
+
+    tbody tr { border-bottom: 1px solid var(--border); transition: background 0.08s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #fafbff; }
+
+    td { padding: 0.7rem 1rem; font-size: 0.875rem; vertical-align: middle; }
+
+    .td-points { font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+
+    .chip {
+      display: inline-block;
+      padding: 0.15rem 0.55rem;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .mult-badge {
+      display: inline-block;
+      padding: 0.15rem 0.45rem;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      background: var(--accent-light);
+      color: var(--accent);
+    }
+    .type-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.18rem 0.5rem;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .type-chip-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+    /* ── Empty state ─────────────────────────── */
+    .empty-row td {
+      text-align: center;
+      padding: 4rem 1rem;
+      color: var(--muted);
+    }
+    .empty-icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+    .empty-row h3 { font-size: 1rem; color: var(--text); margin-bottom: 0.35rem; }
+
+    /* ── Card color dot ──────────────────────── */
+    .card-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 0.35rem; flex-shrink: 0; }
+    .card-cell { display: flex; align-items: center; white-space: nowrap; }
+
+    /* ── Modals ──────────────────────────────── */
+    .backdrop {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.38); z-index: 100;
+      align-items: center; justify-content: center; padding: 1rem;
+    }
+    .backdrop.open { display: flex; }
+    .modal {
+      background: white; border-radius: var(--radius);
+      width: 100%; max-width: 440px;
+      box-shadow: var(--shadow-lg);
+      display: flex; flex-direction: column; max-height: 90vh;
+    }
+    .modal-head {
+      padding: 1.1rem 1.4rem; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+    }
+    .modal-head h2 { font-size: 1.05rem; }
+    .modal-body { padding: 1.25rem 1.4rem; overflow-y: auto; }
+    .modal-foot {
+      padding: 0.9rem 1.4rem; border-top: 1px solid var(--border);
+      display: flex; justify-content: flex-end; gap: 0.65rem; flex-shrink: 0;
+    }
+
+    /* list items inside modals */
+    .list-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.6rem 0.75rem; border: 1px solid var(--border);
+      border-radius: 8px; margin-bottom: 0.5rem;
+    }
+    .list-item-left { display: flex; align-items: center; gap: 0.6rem; }
+    .list-swatch { width: 22px; height: 22px; border-radius: 5px; flex-shrink: 0; }
+    .list-name  { font-size: 0.875rem; font-weight: 600; }
+    .list-sub   { font-size: 0.75rem; color: var(--muted); }
+
+    /* color grid */
+    .color-grid { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.4rem; }
+    .swatch {
+      width: 28px; height: 28px; border-radius: 7px; cursor: pointer;
+      border: 3px solid transparent; transition: transform 0.1s, border-color 0.1s; flex-shrink: 0;
+    }
+    .swatch:hover { transform: scale(1.12); }
+    .swatch.active { border-color: #1a1d23; transform: scale(1.12); }
+
+    /* ── Card category-multiplier UI inside Manage Cards modal ── */
+    .cm-card-item {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.65rem 0.75rem;
+      margin-bottom: 0.5rem;
+    }
+    .cm-card-top {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 0.5rem;
+    }
+    .cm-card-top-left { display: flex; align-items: center; gap: 0.6rem; }
+    .cm-mult-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.45rem; }
+    .cm-mult-chip {
+      display: inline-flex; align-items: center; gap: 0.28rem;
+      padding: 0.18rem 0.4rem 0.18rem 0.5rem;
+      border-radius: 6px; font-size: 0.73rem;
+      background: var(--bg); border: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    .cm-mult-chip .cm-cat  { font-weight: 500; }
+    .cm-mult-chip .cm-pts  { font-weight: 700; color: var(--accent); }
+    .cm-mult-remove {
+      background: none; border: none; cursor: pointer; color: var(--muted);
+      font-size: 0.72rem; line-height: 1; padding: 0 0 0 0.05rem;
+      display: inline-flex; align-items: center;
+    }
+    .cm-mult-remove:hover { color: var(--danger); }
+    .cm-no-mults { font-size: 0.78rem; color: var(--muted); margin-bottom: 0.4rem; display: block; }
+    .cm-add-row { display: flex; gap: 0.4rem; align-items: center; }
+    .cm-add-row select { flex: 1.4; font-size: 0.8rem; padding: 0.3rem 0.5rem; height: 30px; border: 1.5px solid var(--border); border-radius: 7px; font-family: inherit; background: white; }
+    .cm-add-row select:focus { outline: none; border-color: var(--accent); }
+    .cm-add-row input  { width: 72px; flex-shrink: 0; font-size: 0.8rem; padding: 0.3rem 0.5rem; height: 30px; border: 1.5px solid var(--border); border-radius: 7px; font-family: inherit; }
+    .cm-add-row input:focus { outline: none; border-color: var(--accent); }
+    .cm-add-btn {
+      padding: 0 0.65rem; border-radius: 6px; border: none; flex-shrink: 0;
+      background: var(--accent); color: white; font-size: 0.78rem;
+      font-weight: 600; cursor: pointer; font-family: inherit; height: 30px;
+    }
+    .cm-add-btn:hover { background: #4338ca; }
+
+    /* ── Tagged-card chips inside points type items ── */
+    .pt-list-item {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.65rem 0.75rem;
+      margin-bottom: 0.5rem;
+    }
+    .pt-list-top {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 0.4rem;
+    }
+    .pt-list-top-left { display: flex; align-items: center; gap: 0.6rem; }
+    .pt-cards-row { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.45rem; min-height: 0; }
+    .pt-card-chip {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      padding: 0.2rem 0.5rem 0.2rem 0.4rem;
+      border-radius: 999px; font-size: 0.73rem; font-weight: 600;
+      background: var(--bg); border: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    .pt-card-chip-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .pt-chip-remove {
+      background: none; border: none; cursor: pointer; color: var(--muted);
+      font-size: 0.75rem; line-height: 1; padding: 0 0 0 0.1rem;
+      display: inline-flex; align-items: center;
+    }
+    .pt-chip-remove:hover { color: var(--danger); }
+    .pt-tag-row { display: flex; gap: 0.4rem; }
+    .pt-tag-row select { flex: 1; font-size: 0.8rem; padding: 0.3rem 0.5rem; height: 30px; }
+    .pt-tag-btn {
+      padding: 0.3rem 0.65rem; border-radius: 6px; border: none;
+      background: var(--accent); color: white; font-size: 0.78rem;
+      font-weight: 600; cursor: pointer; white-space: nowrap; font-family: inherit;
+      height: 30px;
+    }
+    .pt-tag-btn:hover { background: #4338ca; }
+    .pt-no-cards { font-size: 0.78rem; color: var(--muted); margin-bottom: 0.4rem; }
+
+    /* ── Category management modal ───────────────────── */
+    .cat-list-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.5rem 0.6rem; border: 1px solid var(--border);
+      border-radius: 8px; margin-bottom: 0.4rem;
+    }
+    .cat-list-item.is-editing { border-color: var(--accent); background: #fafbff; flex-direction: column; align-items: stretch; gap: 0.5rem; }
+    .cat-list-left  { display: flex; align-items: center; gap: 0.55rem; }
+    .cat-preview    { display: inline-block; padding: 0.15rem 0.6rem; border-radius: 999px; font-size: 0.78rem; font-weight: 600; white-space: nowrap; }
+    .cat-list-actions { display: flex; gap: 0.25rem; flex-shrink: 0; }
+    .cat-edit-btn {
+      background: transparent; border: none; cursor: pointer; color: var(--muted);
+      border-radius: 5px; width: 26px; height: 26px;
+      display: inline-flex; align-items: center; justify-content: center; font-size: 0.82rem;
+      transition: background 0.1s, color 0.1s;
+    }
+    .cat-edit-btn:hover { background: var(--accent-light); color: var(--accent); }
+    .cat-edit-row { display: flex; gap: 0.5rem; align-items: center; }
+    .cat-edit-row input[type=text] { flex: 1; font-size: 0.85rem; padding: 0.4rem 0.6rem; height: 32px; }
+    .cat-edit-save {
+      padding: 0 0.7rem; height: 32px; border-radius: 6px; border: none;
+      background: var(--accent); color: white; font-size: 0.8rem; font-weight: 600;
+      cursor: pointer; font-family: inherit; flex-shrink: 0;
+    }
+    .cat-edit-save:hover { background: #4338ca; }
+    .cat-edit-cancel {
+      padding: 0 0.6rem; height: 32px; border-radius: 6px;
+      border: 1px solid var(--border); background: white; color: var(--muted);
+      font-size: 0.8rem; cursor: pointer; font-family: inherit; flex-shrink: 0;
+    }
+    .cat-edit-cancel:hover { background: var(--bg); }
+
+    /* section divider inside modal */
+    .modal-section-head {
+      font-size: 0.82rem; font-weight: 600;
+      margin: 1rem 0 0.6rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+    }
+    .modal-section-head:first-child { border-top: none; margin-top: 0; padding-top: 0; }
+
+    /* tfoot totals */
+    tfoot td {
+      padding: 0.75rem 1rem;
+      font-size: 0.875rem;
+      font-weight: 700;
+      background: #f8f9fc;
+      border-top: 2px solid var(--border);
+    }
+
+    /* scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">&#x2B50; Points Tracker</div>
+  <div class="header-actions">
+    <button class="btn btn-ghost btn-sm" onclick="openManageCategories()">Categories</button>
+    <button class="btn btn-ghost btn-sm" onclick="openManagePointsTypes()">Points Types</button>
+    <button class="btn btn-ghost btn-sm" onclick="openManageCards()">Manage Cards</button>
+  </div>
+</header>
+
+<main>
+  <div class="summary" id="summary"></div>
+  <div id="breakdownSection"></div>
+
+  <!-- Add purchase form -->
+  <div class="add-panel">
+    <h2>Log a Purchase</h2>
+    <div class="fgrid">
+      <!-- Row 1: description full width -->
+      <div class="fgroup full-row">
+        <label for="pDesc">Description</label>
+        <input type="text" id="pDesc" placeholder="e.g. Whole Foods grocery run" autocomplete="off">
+      </div>
+      <!-- Row 2: fields + add button -->
+      <div class="fgroup">
+        <label for="pAmount">Amount ($)</label>
+        <input type="number" id="pAmount" placeholder="0.00" min="0.01" step="0.01">
+      </div>
+      <div class="fgroup">
+        <label for="pCard">Card</label>
+        <select id="pCard" onchange="autoSelectPtsType(); autoFillMultiplier()"></select>
+      </div>
+      <div class="fgroup">
+        <label for="pPtsType">Points Type</label>
+        <select id="pPtsType"></select>
+      </div>
+      <div class="fgroup">
+        <label for="pCat">Category</label>
+        <select id="pCat" onchange="autoFillMultiplier()"></select>
+      </div>
+      <div class="fgroup">
+        <label for="pMult">Multiplier (x pts/$)</label>
+        <input type="number" id="pMult" placeholder="1" min="0.1" step="0.25">
+      </div>
+      <div class="fgroup">
+        <label for="pDate">Date</label>
+        <input type="date" id="pDate">
+      </div>
+      <div class="fgroup" style="justify-content:flex-end">
+        <button class="btn btn-primary" onclick="addPurchase()" style="height:38px;white-space:nowrap">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters">
+    <span class="filter-label">Filter:</span>
+    <select class="filter-select" id="fCard" onchange="renderTable()">
+      <option value="">All Cards</option>
+    </select>
+    <select class="filter-select" id="fPtsType" onchange="renderTable()">
+      <option value="">All Types</option>
+    </select>
+    <select class="filter-select" id="fCat" onchange="renderTable()"></select>
+    <div class="filter-spacer"></div>
+    <span id="rowCount" style="font-size:0.8rem;color:var(--muted)"></span>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th onclick="sortBy('desc')"    data-col="desc">Description <span class="sort-icon"></span></th>
+          <th onclick="sortBy('date')"    data-col="date">Date <span class="sort-icon"></span></th>
+          <th onclick="sortBy('card')"    data-col="card">Card <span class="sort-icon"></span></th>
+          <th onclick="sortBy('ptstype')" data-col="ptstype">Points Type <span class="sort-icon"></span></th>
+          <th onclick="sortBy('cat')"     data-col="cat">Category <span class="sort-icon"></span></th>
+          <th onclick="sortBy('mult')"    data-col="mult" style="text-align:center">Mult <span class="sort-icon"></span></th>
+          <th onclick="sortBy('amount')"  data-col="amount" style="text-align:right">Amount <span class="sort-icon"></span></th>
+          <th onclick="sortBy('points')"  data-col="points" style="text-align:right">Points <span class="sort-icon"></span></th>
+          <th style="width:40px"></th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+      <tfoot id="tableFoot"></tfoot>
+    </table>
+  </div>
+</main>
+
+<!-- ── Manage Cards Modal ────────────────────────────── -->
+<div class="backdrop" id="cardModal" onclick="backdropClose(event,'cardModal')">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Manage Cards</h2>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('cardModal')">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <div id="cardListEl"></div>
+      <div class="modal-section-head">Add New Card</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:0.5rem">
+        <div class="fgroup">
+          <label>Card Name</label>
+          <input type="text" id="ncName" placeholder="e.g. Sapphire Reserve">
+        </div>
+        <div class="fgroup">
+          <label>Bank / Issuer</label>
+          <input type="text" id="ncBank" placeholder="e.g. Chase">
+        </div>
+      </div>
+      <div class="fgroup" style="margin-bottom:0.75rem">
+        <label>Color</label>
+        <div class="color-grid" id="cardColorGrid"></div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="addCard()">Add Card</button>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('cardModal')">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Manage Categories Modal ───────────────────────── -->
+<div class="backdrop" id="catModal" onclick="backdropClose(event,'catModal')">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Categories</h2>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('catModal')">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <div id="catListEl"></div>
+      <div class="modal-section-head">Add Category</div>
+      <div style="display:flex;gap:0.5rem;align-items:flex-end;margin-bottom:0.5rem">
+        <div class="fgroup" style="flex:1">
+          <label>Name</label>
+          <input type="text" id="newCatName" placeholder="e.g. Subscriptions">
+        </div>
+      </div>
+      <div class="fgroup" style="margin-bottom:0.75rem">
+        <label>Color</label>
+        <div class="color-grid" id="catAddColorGrid"></div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="addCategory()">Add Category</button>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('catModal')">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Manage Points Types Modal ─────────────────────── -->
+<div class="backdrop" id="ptsTypeModal" onclick="backdropClose(event,'ptsTypeModal')">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Points Types</h2>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('ptsTypeModal')">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <div id="ptsTypeListEl"></div>
+      <div class="modal-section-head">Add New Points Type</div>
+      <div class="fgroup" style="margin-bottom:0.5rem">
+        <label>Name</label>
+        <input type="text" id="nptName" placeholder="e.g. Chase Ultimate Rewards">
+      </div>
+      <div class="fgroup" style="margin-bottom:0.75rem">
+        <label>Color</label>
+        <div class="color-grid" id="ptsTypeColorGrid"></div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="addPointsType()">Add Points Type</button>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('ptsTypeModal')">Done</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Constants ────────────────────────────────────────────────────────────────
+const KEY = 'pts_v1';
+const PALETTE = [
+  '#0f3460','#16213e','#1e40af','#0369a1',
+  '#0e7490','#134e4a','#065f46','#166534',
+  '#7f1d1d','#9f1239','#be185d','#9d174d',
+  '#4c1d95','#312e81','#6b21a8','#7e22ce',
+  '#92400e','#78350f','#b45309','#a16207',
+  '#374151','#1e293b','#1f2937','#27272a',
+];
+
+// Default categories (used for migration only)
+const DEFAULT_CATEGORIES = [
+  { name: 'Dining',        color: '#92400e' },
+  { name: 'Groceries',     color: '#166534' },
+  { name: 'Travel',        color: '#1d4ed8' },
+  { name: 'Gas',           color: '#9a3412' },
+  { name: 'Entertainment', color: '#9d174d' },
+  { name: 'Shopping',      color: '#5b21b6' },
+  { name: 'Streaming',     color: '#155e75' },
+  { name: 'Hotels',        color: '#14532d' },
+  { name: 'Airlines',      color: '#1e40af' },
+  { name: 'Other',         color: '#374151' },
+];
+
+const CAT_COLORS = {
+  'Dining':        { bg: '#fef3c7', fg: '#92400e' },
+  'Groceries':     { bg: '#dcfce7', fg: '#166534' },
+  'Travel':        { bg: '#dbeafe', fg: '#1d4ed8' },
+  'Gas':           { bg: '#ffedd5', fg: '#9a3412' },
+  'Entertainment': { bg: '#fce7f3', fg: '#9d174d' },
+  'Shopping':      { bg: '#ede9fe', fg: '#5b21b6' },
+  'Streaming':     { bg: '#cffafe', fg: '#155e75' },
+  'Hotels':        { bg: '#f0fdf4', fg: '#14532d' },
+  'Airlines':      { bg: '#eff6ff', fg: '#1e40af' },
+  'Other':         { bg: '#f3f4f6', fg: '#374151' },
+};
+
+// ── State ────────────────────────────────────────────────────────────────────
+let db = { cards: [], purchases: [], pointsTypes: [] };
+let sortCol = 'date';
+let sortDir = 'desc';
+// separate active colors for each modal's color picker
+let activeCardColor     = PALETTE[0];
+let activePtsColor      = PALETTE[4];
+let activeCatColor      = PALETTE[16];  // warm amber default for new categories
+let activeEditCatColor  = PALETTE[16];
+let editingCatName      = null;
+
+// ── Persistence ──────────────────────────────────────────────────────────────
+function load() {
+  try {
+    const r = localStorage.getItem(KEY);
+    if (r) {
+      const parsed = JSON.parse(r);
+      // migrate: ensure pointsTypes exists for older saved data
+      db = { pointsTypes: [], ...parsed };
+    }
+    // migrate: ensure categories exists (first load or upgrade from older data)
+    if (!db.categories) db.categories = DEFAULT_CATEGORIES.map(c => ({ ...c }));
+  } catch {}
+}
+function save() { localStorage.setItem(KEY, JSON.stringify(db)); }
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function uid()  { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function fmtUSD(n) { return '$' + (+n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmtPts(n) { return Math.round(n).toLocaleString('en-US'); }
+function pts(p)    { return p.amount * p.multiplier; }
+
+function getCard(id)     { return db.cards.find(c => c.id === id); }
+function getPtsType(id)  { return db.pointsTypes.find(t => t.id === id); }
+
+// ── Render everything ────────────────────────────────────────────────────────
+function render() { renderSummary(); renderBreakdown(); renderSelects(); renderTable(); }
+
+// ── Summary ──────────────────────────────────────────────────────────────────
+function renderSummary() {
+  const all        = db.purchases;
+  const totalSpend = all.reduce((s,p) => s + p.amount, 0);
+  const totalPts   = all.reduce((s,p) => s + pts(p), 0);
+  const purchases  = all.length;
+
+  const byCard = {};
+  all.forEach(p => {
+    const card = getCard(p.cardId);
+    const name = card ? card.name : null;
+    if (name) byCard[name] = (byCard[name] || 0) + pts(p);
+  });
+  const topCard = Object.entries(byCard).sort((a,b)=>b[1]-a[1])[0];
+
+  document.getElementById('summary').innerHTML = `
+    <div class="stat">
+      <div class="stat-label">Purchases</div>
+      <div class="stat-value blue">${purchases}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Total Spend</div>
+      <div class="stat-value">${fmtUSD(totalSpend)}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Total Points</div>
+      <div class="stat-value green">${fmtPts(totalPts)}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Top Card</div>
+      <div class="stat-value purple" style="font-size:${topCard&&topCard[0].length>12?'1rem':'1.2rem'}">
+        ${topCard ? esc(topCard[0]) : '—'}
+      </div>
+    </div>
+  `;
+}
+
+// ── Points-by-type breakdown ──────────────────────────────────────────────────
+function renderBreakdown() {
+  const sec = document.getElementById('breakdownSection');
+  if (db.pointsTypes.length === 0) { sec.innerHTML = ''; return; }
+
+  // Tally by pointsTypeId
+  const tally = {};
+  db.pointsTypes.forEach(t => { tally[t.id] = { spend: 0, points: 0, count: 0 }; });
+  tally['__none__'] = { spend: 0, points: 0, count: 0 };
+
+  db.purchases.forEach(p => {
+    const key = p.pointsTypeId && tally[p.pointsTypeId] ? p.pointsTypeId : '__none__';
+    tally[key].spend  += p.amount;
+    tally[key].points += pts(p);
+    tally[key].count  += 1;
+  });
+
+  const rows = db.pointsTypes.map(t => {
+    const d = tally[t.id];
+    return `
+      <tr>
+        <td>
+          <div class="breakdown-type-cell">
+            <span class="type-dot" style="background:${t.color}"></span>
+            <span>${esc(t.name)}</span>
+          </div>
+        </td>
+        <td style="color:var(--muted)">${d.count}</td>
+        <td style="color:var(--muted)">${fmtUSD(d.spend)}</td>
+        <td class="breakdown-pts">${fmtPts(d.points)}</td>
+      </tr>`;
+  });
+
+  // Add "Unassigned" row only if there are unassigned purchases
+  const none = tally['__none__'];
+  if (none.count > 0) {
+    rows.push(`
+      <tr>
+        <td style="color:var(--muted)"><em>Unassigned</em></td>
+        <td style="color:var(--muted)">${none.count}</td>
+        <td style="color:var(--muted)">${fmtUSD(none.spend)}</td>
+        <td style="color:var(--muted)">${fmtPts(none.points)}</td>
+      </tr>`);
+  }
+
+  sec.innerHTML = `
+    <div class="breakdown-panel" style="margin-bottom:1.25rem">
+      <div class="breakdown-head">
+        <span>Points by Type</span>
+        <span style="font-size:0.75rem;font-weight:400">Purchases &nbsp;·&nbsp; Spend &nbsp;·&nbsp; Points</span>
+      </div>
+      <table class="breakdown-table">
+        <tbody>${rows.join('')}</tbody>
+      </table>
+    </div>`;
+}
+
+// ── Selects (form dropdowns + filter dropdowns) ───────────────────────────────
+function renderSelects() {
+  // Card select (form)
+  const cardOpts = db.cards.length === 0
+    ? '<option value="">No cards — add one</option>'
+    : db.cards.map(c => `<option value="${c.id}">${esc(c.name)}${c.bank?' ('+esc(c.bank)+')':''}</option>`).join('');
+  document.getElementById('pCard').innerHTML = cardOpts;
+
+  // Points type select (form)
+  const ptOpts = '<option value="">— None —</option>' +
+    db.pointsTypes.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('');
+  document.getElementById('pPtsType').innerHTML = ptOpts;
+
+  // Filter: cards
+  const fCard = document.getElementById('fCard');
+  const prevCard = fCard.value;
+  fCard.innerHTML = '<option value="">All Cards</option>' +
+    db.cards.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+  fCard.value = prevCard;
+
+  // Filter: points types
+  const fPtsType = document.getElementById('fPtsType');
+  const prevPts = fPtsType.value;
+  fPtsType.innerHTML = '<option value="">All Types</option>' +
+    db.pointsTypes.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('');
+  if (db.purchases.some(p => !p.pointsTypeId)) {
+    fPtsType.innerHTML += '<option value="__none__">Unassigned</option>';
+  }
+  fPtsType.value = prevPts;
+
+  // Category select (form) — built from db.categories
+  const pCatEl   = document.getElementById('pCat');
+  const prevpCat = pCatEl.value;
+  pCatEl.innerHTML = (db.categories || [])
+    .map(c => `<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('') ||
+    '<option value="">No categories — add one</option>';
+  if ([...pCatEl.options].some(o => o.value === prevpCat)) pCatEl.value = prevpCat;
+
+  // Filter: categories
+  const fCatEl   = document.getElementById('fCat');
+  const prevfCat = fCatEl.value;
+  fCatEl.innerHTML = '<option value="">All Categories</option>' +
+    (db.categories || [])
+      .map(c => `<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('');
+  if ([...fCatEl.options].some(o => o.value === prevfCat)) fCatEl.value = prevfCat;
+}
+
+// ── Table ─────────────────────────────────────────────────────────────────────
+function sortBy(col) {
+  if (sortCol === col) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+  else { sortCol = col; sortDir = col === 'date' ? 'desc' : 'asc'; }
+  renderTable();
+}
+
+function renderTable() {
+  const fCardId  = document.getElementById('fCard').value;
+  const fPtsType = document.getElementById('fPtsType').value;
+  const fCat     = document.getElementById('fCat').value;
+
+  let rows = db.purchases.filter(p => {
+    if (fCardId  && p.cardId !== fCardId) return false;
+    if (fPtsType) {
+      if (fPtsType === '__none__' && p.pointsTypeId) return false;
+      if (fPtsType !== '__none__' && p.pointsTypeId !== fPtsType) return false;
+    }
+    if (fCat && p.category !== fCat) return false;
+    return true;
+  });
+
+  rows.sort((a, b) => {
+    let av, bv;
+    switch (sortCol) {
+      case 'desc':    av = a.desc.toLowerCase();   bv = b.desc.toLowerCase(); break;
+      case 'date':    av = a.date;                  bv = b.date;               break;
+      case 'card': {  const ca=getCard(a.cardId), cb=getCard(b.cardId);
+                      av=ca?ca.name.toLowerCase():''; bv=cb?cb.name.toLowerCase():''; break; }
+      case 'ptstype':{ const ta=getPtsType(a.pointsTypeId), tb=getPtsType(b.pointsTypeId);
+                      av=ta?ta.name.toLowerCase():'zzz'; bv=tb?tb.name.toLowerCase():'zzz'; break; }
+      case 'cat':     av = a.category.toLowerCase(); bv = b.category.toLowerCase(); break;
+      case 'mult':    av = a.multiplier;             bv = b.multiplier;             break;
+      case 'amount':  av = a.amount;                 bv = b.amount;                 break;
+      case 'points':  av = pts(a);                   bv = pts(b);                   break;
+      default:        av = a.date; bv = b.date;
+    }
+    if (av < bv) return sortDir === 'asc' ? -1 : 1;
+    if (av > bv) return sortDir === 'asc' ?  1 : -1;
+    return 0;
+  });
+
+  document.querySelectorAll('thead th[data-col]').forEach(th => {
+    th.classList.toggle('sort-asc',  th.dataset.col === sortCol && sortDir === 'asc');
+    th.classList.toggle('sort-desc', th.dataset.col === sortCol && sortDir === 'desc');
+  });
+
+  const tbody = document.getElementById('tableBody');
+  const tfoot = document.getElementById('tableFoot');
+
+  document.getElementById('rowCount').textContent =
+    rows.length + ' purchase' + (rows.length !== 1 ? 's' : '');
+
+  if (rows.length === 0) {
+    tbody.innerHTML = `
+      <tr class="empty-row">
+        <td colspan="9">
+          <div class="empty-icon">&#x2B50;</div>
+          <h3>${db.purchases.length === 0 ? 'No purchases yet' : 'No matches'}</h3>
+          <p style="font-size:0.85rem">${db.purchases.length === 0
+            ? 'Log your first purchase above to start tracking points.'
+            : 'Try changing the filters.'}</p>
+        </td>
+      </tr>`;
+    tfoot.innerHTML = '';
+    return;
+  }
+
+  tbody.innerHTML = rows.map(p => {
+    const card   = getCard(p.cardId);
+    const ptype  = getPtsType(p.pointsTypeId);
+    const catCol = getCatStyle(p.category);
+    const earned = pts(p);
+
+    // Points type chip
+    const typeCell = ptype
+      ? `<span class="type-chip" style="background:${hexToLight(ptype.color)};color:${ptype.color}">
+           <span class="type-chip-dot" style="background:${ptype.color}"></span>${esc(ptype.name)}
+         </span>`
+      : `<span style="color:var(--muted);font-size:0.8rem">—</span>`;
+
+    return `
+      <tr>
+        <td style="font-weight:500">${esc(p.desc)}</td>
+        <td style="color:var(--muted);white-space:nowrap">${formatDate(p.date)}</td>
+        <td>
+          <div class="card-cell">
+            <span class="card-dot" style="background:${card?card.color:'#9ca3af'}"></span>
+            <span>${esc(card ? card.name : '—')}</span>
+          </div>
+        </td>
+        <td>${typeCell}</td>
+        <td><span class="chip" style="background:${catCol.bg};color:${catCol.fg}">${esc(p.category)}</span></td>
+        <td style="text-align:center"><span class="mult-badge">${p.multiplier}x</span></td>
+        <td style="text-align:right;font-variant-numeric:tabular-nums">${fmtUSD(p.amount)}</td>
+        <td class="td-points" style="text-align:right">${fmtPts(earned)}</td>
+        <td style="text-align:center">
+          <button class="btn-icon-sm" onclick="deletePurchase('${p.id}')" title="Delete">&#x1F5D1;</button>
+        </td>
+      </tr>`;
+  }).join('');
+
+  const totalAmt = rows.reduce((s,p) => s + p.amount, 0);
+  const totalPts = rows.reduce((s,p) => s + pts(p), 0);
+  tfoot.innerHTML = `
+    <tr>
+      <td colspan="6" style="color:var(--muted);font-weight:600">
+        Totals (${rows.length} purchase${rows.length !== 1 ? 's' : ''})
+      </td>
+      <td style="text-align:right">${fmtUSD(totalAmt)}</td>
+      <td style="text-align:right;color:var(--accent)">${fmtPts(totalPts)}</td>
+      <td></td>
+    </tr>`;
+}
+
+// Convert a dark hex color to a very light tint for chip backgrounds
+function hexToLight(hex) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  const mix = v => Math.round(v + (255-v)*0.85);
+  return `rgb(${mix(r)},${mix(g)},${mix(b)})`;
+}
+
+// Look up a category's chip colors from db.categories
+function getCatStyle(name) {
+  const cat = (db.categories || []).find(c => c.name === name);
+  if (!cat) return { bg: '#f3f4f6', fg: '#374151' };
+  return { bg: hexToLight(cat.color), fg: cat.color };
+}
+
+function formatDate(iso) {
+  if (!iso) return '—';
+  const [y,m,d] = iso.split('-');
+  return new Date(+y, +m-1, +d).toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'});
+}
+
+// ── Add purchase ──────────────────────────────────────────────────────────────
+function addPurchase() {
+  const desc       = document.getElementById('pDesc').value.trim();
+  const amount     = parseFloat(document.getElementById('pAmount').value);
+  const cardId     = document.getElementById('pCard').value;
+  const pointsTypeId = document.getElementById('pPtsType').value || null;
+  const cat        = document.getElementById('pCat').value;
+  const mult       = parseFloat(document.getElementById('pMult').value);
+  const date       = document.getElementById('pDate').value;
+
+  if (!desc)               { shake('pDesc');   return; }
+  if (!amount || amount<=0){ shake('pAmount'); return; }
+  if (!cardId)             { alert('Add a card first via Manage Cards.'); return; }
+  if (!cat)                { shake('pCat');    return; }
+  if (!mult || mult<=0)    { shake('pMult');   return; }
+  if (!date)               { shake('pDate');   return; }
+
+  db.purchases.push({ id: uid(), desc, amount, cardId, pointsTypeId, category: cat, multiplier: mult, date });
+  save();
+
+  document.getElementById('pDesc').value   = '';
+  document.getElementById('pAmount').value = '';
+  document.getElementById('pDesc').focus();
+
+  render();
+}
+
+function shake(id) {
+  const el = document.getElementById(id);
+  el.style.borderColor = 'var(--danger)';
+  el.focus();
+  setTimeout(() => el.style.borderColor = '', 1200);
+}
+
+function deletePurchase(id) {
+  db.purchases = db.purchases.filter(p => p.id !== id);
+  save(); render();
+}
+
+// ── Modal helpers ─────────────────────────────────────────────────────────────
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function backdropClose(e, id) { if (e.target === e.currentTarget) closeModal(id); }
+
+// ── Manage Cards ──────────────────────────────────────────────────────────────
+function openManageCards() {
+  renderColorGrid('cardColorGrid', activeCardColor, 'card');
+  renderCardList();
+  openModal('cardModal');
+  setTimeout(() => document.getElementById('ncName').focus(), 50);
+}
+
+function renderCardList() {
+  const el = document.getElementById('cardListEl');
+  if (db.cards.length === 0) {
+    el.innerHTML = '<div style="font-size:0.85rem;color:var(--muted);padding-bottom:0.5rem">No cards yet. Add one below.</div>';
+    return;
+  }
+  el.innerHTML = db.cards.map(c => {
+    const mults = c.multipliers || {};
+    const entries = Object.entries(mults);
+    // Categories not yet configured for this card
+    const allCatNames = (db.categories || []).map(c => c.name);
+    const remaining = allCatNames.filter(cat => !(cat in mults));
+
+    const chipsHtml = entries.length === 0
+      ? `<span class="cm-no-mults">No multipliers set — add one below</span>`
+      : `<div class="cm-mult-chips">${entries.map(([cat, val]) => {
+          const col = getCatStyle(cat);
+          return `<span class="cm-mult-chip">
+            <span class="cm-cat" style="color:${col.fg}">${esc(cat)}</span>
+            <span class="cm-pts">${val}x</span>
+            <button class="cm-mult-remove" onclick="removeCardMultiplier('${c.id}','${cat}')" title="Remove">&#x2715;</button>
+          </span>`;
+        }).join('')}</div>`;
+
+    const addRowHtml = remaining.length === 0
+      ? `<div style="font-size:0.75rem;color:var(--muted)">All categories configured</div>`
+      : `<div class="cm-add-row">
+          <select id="cmCat_${c.id}">
+            <option value="">Category…</option>
+            ${remaining.map(cat => `<option value="${cat}">${cat}</option>`).join('')}
+          </select>
+          <input type="number" id="cmMult_${c.id}" placeholder="pts/$" min="0.25" step="0.25">
+          <button class="cm-add-btn" onclick="addCardMultiplier('${c.id}')">Add</button>
+        </div>`;
+
+    return `
+      <div class="cm-card-item">
+        <div class="cm-card-top">
+          <div class="cm-card-top-left">
+            <div class="list-swatch" style="background:${c.color}"></div>
+            <div>
+              <div class="list-name">${esc(c.name)}</div>
+              ${c.bank ? `<div class="list-sub">${esc(c.bank)}</div>` : ''}
+            </div>
+          </div>
+          <button class="btn-icon-sm" onclick="deleteCard('${c.id}')" title="Delete">&#x1F5D1;</button>
+        </div>
+        ${chipsHtml}
+        ${addRowHtml}
+      </div>`;
+  }).join('');
+}
+
+function addCard() {
+  const name = document.getElementById('ncName').value.trim();
+  const bank = document.getElementById('ncBank').value.trim();
+  if (!name) { flashRed('ncName'); return; }
+  db.cards.push({ id: uid(), name, bank, color: activeCardColor, multipliers: {} });
+  document.getElementById('ncName').value = '';
+  document.getElementById('ncBank').value = '';
+  save(); renderCardList(); renderSelects(); renderSummary();
+}
+
+function deleteCard(id) {
+  const inUse = db.purchases.some(p => p.cardId === id);
+  if (!confirm(inUse
+    ? 'This card has purchases. Delete it? Purchases will show as unknown card.'
+    : 'Delete this card?')) return;
+  db.cards = db.cards.filter(c => c.id !== id);
+  save(); renderCardList(); render();
+}
+
+function addCardMultiplier(cardId) {
+  const cat  = document.getElementById('cmCat_'  + cardId)?.value;
+  const mult = parseFloat(document.getElementById('cmMult_' + cardId)?.value);
+  if (!cat)            { flashRed('cmCat_'  + cardId); return; }
+  if (!mult || mult <= 0) { flashRed('cmMult_' + cardId); return; }
+  const card = getCard(cardId);
+  if (!card) return;
+  if (!card.multipliers) card.multipliers = {};
+  card.multipliers[cat] = mult;
+  save(); renderCardList();
+}
+
+function removeCardMultiplier(cardId, cat) {
+  const card = getCard(cardId);
+  if (!card || !card.multipliers) return;
+  delete card.multipliers[cat];
+  save(); renderCardList();
+}
+
+// Auto-fill multiplier when card + category are both selected
+function autoFillMultiplier() {
+  const cardId = document.getElementById('pCard').value;
+  const cat    = document.getElementById('pCat').value;
+  const card   = getCard(cardId);
+  if (!card || !cat) return;
+  const val = card.multipliers?.[cat];
+  if (val) document.getElementById('pMult').value = val;
+}
+
+// ── Manage Points Types ───────────────────────────────────────────────────────
+function openManagePointsTypes() {
+  renderColorGrid('ptsTypeColorGrid', activePtsColor, 'pts');
+  renderPtsTypeList();
+  openModal('ptsTypeModal');
+  setTimeout(() => document.getElementById('nptName').focus(), 50);
+}
+
+function renderPtsTypeList() {
+  const el = document.getElementById('ptsTypeListEl');
+  if (db.pointsTypes.length === 0) {
+    el.innerHTML = '<div style="font-size:0.85rem;color:var(--muted);padding-bottom:0.5rem">No points types yet. Add one below.</div>';
+    return;
+  }
+  el.innerHTML = db.pointsTypes.map(t => {
+    // Cards tagged to this type
+    const tagged = db.cards.filter(c => c.pointsTypeId === t.id);
+    // Cards available to tag (not yet tagged to any type, or tagged elsewhere — show all untagged)
+    const untagged = db.cards.filter(c => !c.pointsTypeId);
+
+    const chipHtml = tagged.length === 0
+      ? `<div class="pt-no-cards">No cards tagged yet</div>`
+      : `<div class="pt-cards-row">${tagged.map(c => `
+          <span class="pt-card-chip">
+            <span class="pt-card-chip-dot" style="background:${c.color}"></span>
+            ${esc(c.name)}
+            <button class="pt-chip-remove" onclick="untagCard('${c.id}')" title="Remove">&#x2715;</button>
+          </span>`).join('')}
+        </div>`;
+
+    const tagRowHtml = untagged.length === 0
+      ? `<div style="font-size:0.75rem;color:var(--muted)">All cards are tagged</div>`
+      : `<div class="pt-tag-row">
+          <select id="tagSel_${t.id}">
+            <option value="">Select a card…</option>
+            ${untagged.map(c => `<option value="${c.id}">${esc(c.name)}${c.bank?' ('+esc(c.bank)+')':''}</option>`).join('')}
+          </select>
+          <button class="pt-tag-btn" onclick="tagCard('${t.id}')">Tag</button>
+        </div>`;
+
+    return `
+      <div class="pt-list-item">
+        <div class="pt-list-top">
+          <div class="pt-list-top-left">
+            <div class="list-swatch" style="background:${t.color}"></div>
+            <div class="list-name">${esc(t.name)}</div>
+          </div>
+          <button class="btn-icon-sm" onclick="deletePointsType('${t.id}')" title="Delete">&#x1F5D1;</button>
+        </div>
+        ${chipHtml}
+        ${tagRowHtml}
+      </div>`;
+  }).join('');
+}
+
+// Tag a card to a points type
+function tagCard(ptsTypeId) {
+  const sel = document.getElementById('tagSel_' + ptsTypeId);
+  const cardId = sel ? sel.value : '';
+  if (!cardId) return;
+  const card = getCard(cardId);
+  if (!card) return;
+  card.pointsTypeId = ptsTypeId;
+  save();
+  renderPtsTypeList();
+  renderSelects(); // refresh form card dropdown in case we want to reflect it
+}
+
+// Remove a card's points type tag
+function untagCard(cardId) {
+  const card = getCard(cardId);
+  if (!card) return;
+  card.pointsTypeId = null;
+  save();
+  renderPtsTypeList();
+}
+
+// Auto-select points type in form when card changes
+function autoSelectPtsType() {
+  const cardId = document.getElementById('pCard').value;
+  const card = getCard(cardId);
+  if (card && card.pointsTypeId) {
+    document.getElementById('pPtsType').value = card.pointsTypeId;
+  }
+}
+
+function addPointsType() {
+  const name = document.getElementById('nptName').value.trim();
+  if (!name) { flashRed('nptName'); return; }
+  db.pointsTypes.push({ id: uid(), name, color: activePtsColor });
+  document.getElementById('nptName').value = '';
+  save(); renderPtsTypeList(); render();
+}
+
+function deletePointsType(id) {
+  const inUse = db.purchases.some(p => p.pointsTypeId === id);
+  if (!confirm(inUse
+    ? 'This points type has purchases. Delete it? Those purchases will become unassigned.'
+    : 'Delete this points type?')) return;
+  db.pointsTypes = db.pointsTypes.filter(t => t.id !== id);
+  // clear references in purchases
+  db.purchases.forEach(p => { if (p.pointsTypeId === id) p.pointsTypeId = null; });
+  save(); renderPtsTypeList(); render();
+}
+
+// ── Color picker (shared, keyed by which modal) ───────────────────────────────
+function renderColorGrid(gridId, selected, ctx) {
+  if (ctx === 'card')    activeCardColor    = selected || PALETTE[0];
+  if (ctx === 'pts')     activePtsColor     = selected || PALETTE[4];
+  if (ctx === 'catAdd')  activeCatColor     = selected || PALETTE[16];
+  if (ctx === 'catEdit') activeEditCatColor = selected || PALETTE[16];
+  const cur = ctx === 'pts'     ? activePtsColor
+            : ctx === 'catAdd'  ? activeCatColor
+            : ctx === 'catEdit' ? activeEditCatColor
+            : activeCardColor;
+  document.getElementById(gridId).innerHTML = PALETTE.map(c => `
+    <div class="swatch ${c === cur ? 'active' : ''}"
+         data-color="${c}" data-ctx="${ctx}" style="background:${c}"
+         onclick="pickColor('${c}','${ctx}','${gridId}')"></div>`).join('');
+}
+
+function pickColor(c, ctx, gridId) {
+  if (ctx === 'card')    activeCardColor    = c;
+  if (ctx === 'pts')     activePtsColor     = c;
+  if (ctx === 'catAdd')  activeCatColor     = c;
+  if (ctx === 'catEdit') activeEditCatColor = c;
+  document.querySelectorAll(`#${gridId} .swatch`).forEach(el =>
+    el.classList.toggle('active', el.dataset.color === c));
+}
+
+function flashRed(id) {
+  const el = document.getElementById(id);
+  el.style.borderColor = 'var(--danger)';
+  el.focus();
+  setTimeout(() => el.style.borderColor = '', 1200);
+}
+
+// ── Manage Categories ─────────────────────────────────────────────────────────
+function openManageCategories() {
+  editingCatName = null;
+  renderColorGrid('catAddColorGrid', activeCatColor, 'catAdd');
+  renderCategoryList();
+  openModal('catModal');
+  setTimeout(() => document.getElementById('newCatName').focus(), 50);
+}
+
+function renderCategoryList() {
+  const el = document.getElementById('catListEl');
+  if (!db.categories || db.categories.length === 0) {
+    el.innerHTML = '<div style="font-size:0.85rem;color:var(--muted);padding-bottom:0.5rem">No categories yet. Add one below.</div>';
+    return;
+  }
+  el.innerHTML = db.categories.map(cat => {
+    const style = getCatStyle(cat.name);
+
+    if (editingCatName === cat.name) {
+      // Inline edit row
+      return `
+        <div class="cat-list-item is-editing">
+          <div class="cat-edit-row">
+            <input type="text" id="editCatName" value="${esc(cat.name)}"
+                   style="flex:1;font-size:0.85rem;padding:0.4rem 0.6rem;height:32px"
+                   onkeydown="if(event.key==='Enter')saveEditCategory('${esc(cat.name)}');
+                              if(event.key==='Escape')cancelEditCategory();">
+            <button class="cat-edit-save"   onclick="saveEditCategory('${esc(cat.name)}')">Save</button>
+            <button class="cat-edit-cancel" onclick="cancelEditCategory()">Cancel</button>
+          </div>
+          <div class="fgroup" style="margin-top:0.35rem">
+            <label style="font-size:0.75rem">Color</label>
+            <div class="color-grid" id="catEditColorGrid"></div>
+          </div>
+        </div>`;
+    }
+
+    return `
+      <div class="cat-list-item">
+        <div class="cat-list-left">
+          <span class="cat-preview" style="background:${style.bg};color:${style.fg}">${esc(cat.name)}</span>
+        </div>
+        <div class="cat-list-actions">
+          <button class="cat-edit-btn" onclick="startEditCategory('${esc(cat.name)}')" title="Edit">&#x270F;&#xFE0F;</button>
+          <button class="cat-edit-btn" onclick="deleteCategory('${esc(cat.name)}')" title="Delete"
+                  style="border-radius:5px;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;font-size:0.82rem;background:transparent;border:none;cursor:pointer;color:var(--muted);transition:background 0.1s,color 0.1s;"
+                  onmouseover="this.style.background='#fee2e2';this.style.color='var(--danger)'"
+                  onmouseout="this.style.background='transparent';this.style.color='var(--muted)'">&#x1F5D1;</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  // Wire up the edit color grid immediately after the DOM is updated
+  if (editingCatName) {
+    const cat = db.categories.find(c => c.name === editingCatName);
+    if (cat) renderColorGrid('catEditColorGrid', cat.color, 'catEdit');
+  }
+}
+
+function startEditCategory(name) {
+  editingCatName = name;
+  const cat = db.categories.find(c => c.name === name);
+  if (cat) activeEditCatColor = cat.color;
+  renderCategoryList();
+  setTimeout(() => {
+    const inp = document.getElementById('editCatName');
+    if (inp) { inp.focus(); inp.select(); }
+  }, 30);
+}
+
+function cancelEditCategory() {
+  editingCatName = null;
+  renderCategoryList();
+}
+
+function saveEditCategory(oldName) {
+  const newName = (document.getElementById('editCatName')?.value || '').trim();
+  if (!newName) { flashRed('editCatName'); return; }
+
+  if (newName !== oldName && db.categories.some(c => c.name === newName)) {
+    alert(`A category named "${newName}" already exists.`);
+    return;
+  }
+
+  const cat = db.categories.find(c => c.name === oldName);
+  if (!cat) return;
+
+  cat.name  = newName;
+  cat.color = activeEditCatColor;
+
+  // Rename references in purchases and card multipliers
+  if (newName !== oldName) {
+    db.purchases.forEach(p => { if (p.category === oldName) p.category = newName; });
+    db.cards.forEach(c => {
+      if (c.multipliers && oldName in c.multipliers) {
+        c.multipliers[newName] = c.multipliers[oldName];
+        delete c.multipliers[oldName];
+      }
+    });
+  }
+
+  editingCatName = null;
+  save();
+  renderCategoryList();
+  render();
+}
+
+function addCategory() {
+  const name = document.getElementById('newCatName').value.trim();
+  if (!name) { flashRed('newCatName'); return; }
+  if (db.categories.some(c => c.name === name)) {
+    alert(`A category named "${name}" already exists.`);
+    return;
+  }
+  db.categories.push({ name, color: activeCatColor });
+  document.getElementById('newCatName').value = '';
+  save();
+  renderCategoryList();
+  renderSelects();
+}
+
+function deleteCategory(name) {
+  const inUse = db.purchases.some(p => p.category === name);
+  if (!confirm(inUse
+    ? `"${name}" is used by existing purchases. Delete it? Those purchases will still reference this category name.`
+    : `Delete category "${name}"?`)) return;
+  db.categories = db.categories.filter(c => c.name !== name);
+  // Remove from card multipliers
+  db.cards.forEach(c => {
+    if (c.multipliers && name in c.multipliers) delete c.multipliers[name];
+  });
+  save();
+  renderCategoryList();
+  renderSelects();
+  render();
+}
+
+// ── Keyboard shortcuts ────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.activeElement.closest('.add-panel')) addPurchase();
+  if (e.key === 'Enter' && ['ncName','ncBank'].includes(document.activeElement.id)) addCard();
+  if (e.key === 'Enter' && document.activeElement.id === 'nptName') addPointsType();
+  if (e.key === 'Enter' && document.activeElement.id === 'newCatName') addCategory();
+  if (e.key === 'Escape') ['cardModal','ptsTypeModal','catModal'].forEach(id => closeModal(id));
+});
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+load();
+document.getElementById('pDate').value = new Date().toISOString().slice(0,10);
+render();
+
+// ── Service Worker (PWA / offline support) ────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () =>
+    navigator.serviceWorker.register('pts-sw.js').catch(() => {})
+  );
+}
+</script>
+</body>
+</html>

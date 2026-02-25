@@ -1,0 +1,30 @@
+{
+  "name": "Points Tracker",
+  "short_name": "Points",
+  "description": "Track credit card points earned from purchases",
+  "start_url": "./points-tracker.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f0f2f5",
+  "theme_color": "#4f46e5",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "icons/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
