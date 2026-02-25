@@ -402,6 +402,37 @@
       font-weight: 700;
     }
 
+    /* ── Year grid (All Bills) ───────────────────── */
+    .year-grid { font-size: 0.8rem; }
+    .year-grid th { font-size: 0.7rem; padding: 0.5rem 0.4rem; text-align: center; }
+    .year-grid td { text-align: center; padding: 0.45rem 0.4rem; }
+    .year-grid td.bill-name-col {
+      text-align: left;
+      padding-left: 0.75rem;
+      white-space: nowrap;
+      position: sticky;
+      left: 0;
+      background: white;
+      z-index: 2;
+    }
+    .year-grid thead th:first-child {
+      position: sticky;
+      left: 0;
+      background: #f8f9fc;
+      z-index: 3;
+    }
+    .year-grid .month-cell {
+      cursor: pointer;
+      border-radius: 4px;
+      transition: background 0.1s;
+      padding: 0.35rem 0.25rem;
+    }
+    .year-grid .month-cell:hover { background: var(--accent-light); }
+    .year-grid .month-cell.has-override { font-weight: 700; color: var(--accent); }
+    .year-grid .total-row td { font-weight: 700; border-top: 2px solid var(--border); }
+    .year-grid .total-row .neg { color: var(--danger); }
+    .year-grid .actions-col { white-space: nowrap; }
+
     /* ── Scrollbar ───────────────────────────────── */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
@@ -912,36 +943,53 @@ function renderBills() {
     return;
   }
 
+  const y = currentYear;
   const sorted = [...db.bills].sort((a, b) => a.dueDay - b.dueDay);
+  const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-  let html = `<table>
+  let html = `<table class="year-grid">
     <thead><tr>
       <th>Bill</th>
-      <th>Category</th>
-      <th class="r">Due Day</th>
-      <th class="r">Cut Day</th>
-      <th class="r">Amount</th>
+      <th>Due</th>
+      <th>Cut</th>
+      ${MO.map(m => `<th>${m}</th>`).join('')}
       <th></th>
     </tr></thead><tbody>`;
 
   sorted.forEach(b => {
     html += `<tr>
-      <td>
+      <td class="bill-name-col">
         <span class="bill-name-cell">
           <span class="color-dot" style="background:${b.color}"></span>
           ${esc(b.name)}
         </span>
       </td>
-      <td style="color:var(--muted)">${esc(b.category)}</td>
-      <td class="r">${ordinal(b.dueDay)}</td>
-      <td class="r">${b.cutDay ? ordinal(b.cutDay) : '—'}</td>
-      <td class="r" style="font-weight:600">${fmtC(b.amount)}</td>
-      <td style="white-space:nowrap">
+      <td>${ordinal(b.dueDay)}</td>
+      <td>${b.cutDay ? ordinal(b.cutDay) : '—'}</td>`;
+
+    for (let m = 0; m < 12; m++) {
+      const mk = monthKey(y, m);
+      const overrideKey = `${b.id}:${mk}`;
+      const hasOverride = db.overrides[overrideKey] != null;
+      const amt = billAmountForMonth(b, y, m);
+      const cls = hasOverride ? 'month-cell has-override' : 'month-cell';
+      html += `<td><span class="${cls}" onclick="openOverrideModal('${b.id}','${mk}')" title="${MONTHS[m]} — click to edit">${amt > 0 ? fmtC(amt) : '—'}</span></td>`;
+    }
+
+    html += `<td class="actions-col">
         <button class="btn-icon-sm" onclick="openBillModal('${b.id}')" title="Edit">&#x270F;&#xFE0F;</button>
         <button class="btn-icon-sm" onclick="deleteBill('${b.id}')" title="Delete">&#x1F5D1;&#xFE0F;</button>
       </td>
     </tr>`;
   });
+
+  // Total row
+  html += `<tr class="total-row"><td class="bill-name-col" style="font-weight:700">Total</td><td></td><td></td>`;
+  for (let m = 0; m < 12; m++) {
+    const total = sorted.reduce((s, b) => s + billAmountForMonth(b, y, m), 0);
+    html += `<td class="neg">${fmtC(-total)}</td>`;
+  }
+  html += `<td></td></tr>`;
 
   html += `</tbody></table>`;
   document.getElementById('billsTable').innerHTML = html;
@@ -1076,8 +1124,10 @@ function openOverrideModal(billId, mk) {
   const overrideKey = `${billId}:${mk}`;
   const currentAmt = db.overrides[overrideKey] != null ? db.overrides[overrideKey] : bill.amount;
 
+  // Parse month/year from monthKey (YYYY-MM)
+  const [mkY, mkM] = mk.split('-').map(Number);
   document.getElementById('overrideModalTitle').textContent = `Edit — ${bill.name}`;
-  document.getElementById('overrideLabel').textContent = `Amount for ${MONTHS[currentMonth]} ${currentYear}`;
+  document.getElementById('overrideLabel').textContent = `Amount for ${MONTHS[mkM - 1]} ${mkY}`;
   document.getElementById('oAmount').value = currentAmt;
   document.getElementById('overrideHint').textContent = 'Leave at 0 to skip this bill for the month. This only affects the selected month.';
   document.getElementById('overrideResetBtn').style.display = db.overrides[overrideKey] != null ? '' : 'none';
