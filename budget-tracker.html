@@ -462,6 +462,7 @@
     <button class="btn btn-ghost btn-sm" onclick="document.getElementById('importFile').click()" title="Import data">&#x1F4E5; Import</button>
     <button class="btn btn-ghost btn-sm" onclick="openIncomeModal()">&#x2699;&#xFE0F; Income</button>
     <button class="btn btn-primary" onclick="openBillModal()">+ Add Bill</button>
+    <button class="btn btn-primary" style="background:var(--success)" onclick="openExtraIncomeModal()">+ Add Income</button>
   </div>
 </header>
 <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(this)">
@@ -608,6 +609,37 @@
   </div>
 </div>
 
+<!-- ── Extra Income Modal ──────────────────────────────────────────────────── -->
+<div class="backdrop" id="extraIncomeModal" onclick="backdropClose(event,'extraIncomeModal')">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="extraIncomeTitle">Add Extra Income</h2>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('extraIncomeModal')">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <div class="fgroup">
+        <label>Description</label>
+        <input type="text" id="eiName" placeholder="e.g. Tax refund, Bonus, Side job">
+      </div>
+      <div class="frow">
+        <div class="fgroup">
+          <label>Amount ($)</label>
+          <input type="number" id="eiAmount" placeholder="0.00" min="0.01" step="0.01">
+        </div>
+        <div class="fgroup">
+          <label>Date</label>
+          <input type="date" id="eiDate">
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-danger" id="eiDeleteBtn" onclick="deleteExtraIncome()" style="margin-right:auto;display:none">Delete</button>
+      <button class="btn btn-ghost" onclick="closeModal('extraIncomeModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveExtraIncome()">Save</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ── Constants ───────────────────────────────────────────────────────────────
 const KEY = 'bt_v1';
@@ -635,7 +667,9 @@ let db = {
     startingBalance: 0
   },
   overrides: {},   // key: "billId:YYYY-MM" → amount
-  payOverrides: {} // key: "pay:YYYY-MM-DD" → amount
+  payOverrides: {}, // key: "pay:YYYY-MM-DD" → amount
+  extraIncome: [],  // { id, name, amount, date (YYYY-MM-DD) }
+  balanceOverrides: {} // key: "YYYY-MM" → starting balance for that month
 };
 
 let editBillId = null;
@@ -657,6 +691,8 @@ function loadDb() {
   if (db.income.startingBalance == null) db.income.startingBalance = 0;
   if (!db.overrides) db.overrides = {};
   if (!db.payOverrides) db.payOverrides = {};
+  if (!db.extraIncome) db.extraIncome = [];
+  if (!db.balanceOverrides) db.balanceOverrides = {};
   db.bills.forEach(b => {
     if (!b.category) b.category = 'Other';
     if (!b.color) b.color = PALETTE[0];
@@ -782,11 +818,31 @@ function buildTally(y, m) {
     });
   });
 
-  // Sort by day, then paydays before bills on same day
+  // Add extra income events
+  const mk = monthKey(y, m);
+  db.extraIncome.forEach(ei => {
+    const eiMk = ei.date.slice(0, 7); // "YYYY-MM"
+    if (eiMk === mk) {
+      const d = new Date(ei.date + 'T00:00:00');
+      events.push({
+        day: d.getDate(),
+        type: 'extra',
+        name: ei.name,
+        amount: ei.amount,
+        color: null,
+        billId: null,
+        extraId: ei.id
+      });
+    }
+  });
+
+  // Sort by day, then income before bills on same day
   events.sort((a, b) => {
     if (a.day !== b.day) return a.day - b.day;
-    if (a.type === 'payday' && b.type !== 'payday') return -1;
-    if (a.type !== 'payday' && b.type === 'payday') return 1;
+    const aIncome = a.type === 'payday' || a.type === 'extra';
+    const bIncome = b.type === 'payday' || b.type === 'extra';
+    if (aIncome && !bIncome) return -1;
+    if (!aIncome && bIncome) return 1;
     return 0;
   });
 
@@ -812,13 +868,24 @@ function buildTally(y, m) {
 }
 
 function computeBalanceAtStartOfMonth(y, m) {
+  // Check if this month has a direct balance override
+  const thisMk = monthKey(y, m);
+  if (db.balanceOverrides[thisMk] != null) return db.balanceOverrides[thisMk];
+
+  // Find the most recent month with a balance override to start from
   let bal = db.income.startingBalance || 0;
+  let startMonth = 0; // default: start from January
 
-  // We'll define "starting balance" as balance at the start of January of the year
-  // Then accumulate from Jan through (m-1)
-  const startYear = y;
-  const startMonth = 0; // January
+  for (let mm = m - 1; mm >= 0; mm--) {
+    const mk = monthKey(y, mm);
+    if (db.balanceOverrides[mk] != null) {
+      bal = db.balanceOverrides[mk];
+      startMonth = mm;
+      break;
+    }
+  }
 
+  // Accumulate from startMonth through (m-1)
   for (let mm = startMonth; mm < m; mm++) {
     // Add income (respecting per-payday overrides)
     const payDates = getPayDatesForMonth(y, mm);
@@ -834,6 +901,12 @@ function computeBalanceAtStartOfMonth(y, m) {
     db.bills.forEach(bill => {
       const amt = billAmountForMonth(bill, y, mm);
       if (amt > 0) bal -= amt;
+    });
+
+    // Add extra income
+    const mk = monthKey(y, mm);
+    db.extraIncome.forEach(ei => {
+      if (ei.date.slice(0, 7) === mk) bal += ei.amount;
     });
   }
 
@@ -851,11 +924,15 @@ function renderSummary() {
   const mk = monthKey(currentYear, currentMonth);
   const totalBills = db.bills.reduce((s, b) => s + billAmountForMonth(b, currentYear, currentMonth), 0);
   const payDates = getPayDatesForMonth(currentYear, currentMonth);
-  const totalIncome = payDates.reduce((s, pd) => {
+  let totalIncome = payDates.reduce((s, pd) => {
     const dk = pd.toISOString().slice(0, 10);
     const amt = db.payOverrides[`pay:${dk}`] != null ? db.payOverrides[`pay:${dk}`] : (db.income.amount || 0);
     return s + amt;
   }, 0);
+  // Add extra income for this month
+  db.extraIncome.forEach(ei => {
+    if (ei.date.slice(0, 7) === mk) totalIncome += ei.amount;
+  });
   const netFlow = totalIncome - totalBills;
   const tally = buildTally(currentYear, currentMonth);
   const endBal = tally.length > 0 ? tally[tally.length - 1].balance : (db.income.startingBalance || 0);
@@ -894,26 +971,30 @@ function renderTally() {
 
   // Show starting balance row
   const startBal = computeBalanceAtStartOfMonth(currentYear, currentMonth);
+  const balMk = monthKey(currentYear, currentMonth);
+  const hasBalOverride = currentMonth > 0 && db.balanceOverrides[balMk] != null;
   html += `<tr class="tally-row" style="background:#f8f9fc">
     <td></td>
-    <td style="font-weight:600;color:var(--muted)">Starting Balance</td>
+    <td style="font-weight:600;color:${hasBalOverride ? 'var(--accent)' : 'var(--muted)'}">Starting Balance${hasBalOverride ? ' *' : ''}</td>
     <td class="r"></td>
     <td class="r"><span class="tally-balance ${startBal >= 0 ? 'positive' : 'negative'}">${fmtC(startBal)}</span></td>
     <td><button class="btn-icon-sm" onclick="openBalanceEdit()" title="Edit starting balance">&#x270F;&#xFE0F;</button></td>
   </tr>`;
 
   rows.forEach(row => {
-    const isPayday = row.type === 'payday';
-    const amtClass = isPayday ? 'tally-payday' : 'tally-bill';
+    const isIncome = row.type === 'payday' || row.type === 'extra';
+    const amtClass = isIncome ? 'tally-payday' : 'tally-bill';
     const mk = monthKey(currentYear, currentMonth);
     let editBtn = '';
     if (row.billId) {
       editBtn = `<button class="btn-icon-sm" onclick="openOverrideModal('${row.billId}','${mk}')" title="Edit amount for this month">&#x270F;&#xFE0F;</button>`;
     } else if (row.type === 'payday' && row.dateKey) {
       editBtn = `<button class="btn-icon-sm" onclick="openPayOverrideModal('${row.dateKey}')" title="Edit payday amount">&#x270F;&#xFE0F;</button>`;
+    } else if (row.type === 'extra' && row.extraId) {
+      editBtn = `<button class="btn-icon-sm" onclick="openExtraIncomeModal('${row.extraId}')" title="Edit extra income">&#x270F;&#xFE0F;</button>`;
     }
 
-    html += `<tr class="tally-row ${isPayday ? 'is-payday' : ''}">
+    html += `<tr class="tally-row ${isIncome ? 'is-payday' : ''}">
       <td><span class="day-badge">${row.day}</span></td>
       <td>
         <span class="bill-name-cell">
@@ -1154,12 +1235,18 @@ function openPayOverrideModal(dateKey) {
 
 // ── Edit starting balance ───────────────────────────────────────────────────
 function openBalanceEdit() {
-  overrideCtx = { type: 'balance' };
+  const mk = monthKey(currentYear, currentMonth);
+  const isJan = currentMonth === 0;
+  const hasOverride = !isJan && db.balanceOverrides[mk] != null;
+
+  overrideCtx = { type: 'balance', monthKey: mk, isJan };
   document.getElementById('overrideModalTitle').textContent = 'Edit Starting Balance';
-  document.getElementById('overrideLabel').textContent = 'Balance at the start of January ' + currentYear;
-  document.getElementById('oAmount').value = db.income.startingBalance || 0;
-  document.getElementById('overrideHint').textContent = 'This is your cash on hand at the beginning of the year. All months are projected from this.';
-  document.getElementById('overrideResetBtn').style.display = 'none';
+  document.getElementById('overrideLabel').textContent = `Starting balance for ${MONTHS[currentMonth]} ${currentYear}`;
+  document.getElementById('oAmount').value = computeBalanceAtStartOfMonth(currentYear, currentMonth);
+  document.getElementById('overrideHint').textContent = isJan
+    ? 'This is your cash on hand at the beginning of the year.'
+    : 'Override the starting balance for this month. It carries forward until you override another month.';
+  document.getElementById('overrideResetBtn').style.display = hasOverride ? '' : 'none';
   openModal('overrideModal');
   setTimeout(() => document.getElementById('oAmount').focus(), 50);
 }
@@ -1173,7 +1260,11 @@ function saveOverride() {
   } else if (overrideCtx.type === 'pay') {
     db.payOverrides[`pay:${overrideCtx.dateKey}`] = amt;
   } else if (overrideCtx.type === 'balance') {
-    db.income.startingBalance = amt;
+    if (overrideCtx.isJan) {
+      db.income.startingBalance = amt;
+    } else {
+      db.balanceOverrides[overrideCtx.monthKey] = amt;
+    }
   }
 
   saveDb(); render(); closeModal('overrideModal');
@@ -1186,9 +1277,53 @@ function resetOverride() {
     delete db.overrides[`${overrideCtx.billId}:${overrideCtx.monthKey}`];
   } else if (overrideCtx.type === 'pay') {
     delete db.payOverrides[`pay:${overrideCtx.dateKey}`];
+  } else if (overrideCtx.type === 'balance' && !overrideCtx.isJan) {
+    delete db.balanceOverrides[overrideCtx.monthKey];
   }
 
   saveDb(); render(); closeModal('overrideModal');
+}
+
+// ── Extra Income CRUD ────────────────────────────────────────────────────────
+let editExtraIncomeId = null;
+
+function openExtraIncomeModal(id) {
+  editExtraIncomeId = id || null;
+  const entry = id ? db.extraIncome.find(e => e.id === id) : null;
+  document.getElementById('extraIncomeTitle').textContent = entry ? 'Edit Extra Income' : 'Add Extra Income';
+  document.getElementById('eiName').value   = entry ? entry.name : '';
+  document.getElementById('eiAmount').value = entry ? entry.amount : '';
+  document.getElementById('eiDate').value   = entry ? entry.date : '';
+  document.getElementById('eiDeleteBtn').style.display = entry ? '' : 'none';
+  openModal('extraIncomeModal');
+  setTimeout(() => document.getElementById('eiName').focus(), 50);
+}
+
+function saveExtraIncome() {
+  const name   = document.getElementById('eiName').value.trim();
+  const amount = parseFloat(document.getElementById('eiAmount').value);
+  const date   = document.getElementById('eiDate').value;
+
+  if (!name)  { alert('Description is required.'); return; }
+  if (isNaN(amount) || amount <= 0) { alert('Enter a valid amount.'); return; }
+  if (!date)  { alert('Date is required.'); return; }
+
+  if (editExtraIncomeId) {
+    const entry = db.extraIncome.find(e => e.id === editExtraIncomeId);
+    entry.name   = name;
+    entry.amount = amount;
+    entry.date   = date;
+  } else {
+    db.extraIncome.push({ id: uid(), name, amount, date });
+  }
+  saveDb(); render(); closeModal('extraIncomeModal');
+}
+
+function deleteExtraIncome() {
+  if (!editExtraIncomeId) return;
+  if (!confirm('Delete this income entry?')) return;
+  db.extraIncome = db.extraIncome.filter(e => e.id !== editExtraIncomeId);
+  saveDb(); render(); closeModal('extraIncomeModal');
 }
 
 // ── Export / Import ─────────────────────────────────────────────────────────
