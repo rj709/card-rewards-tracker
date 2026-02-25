@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Card Rewards Tracker</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="/card-rewards-tracker/manifest.json">
+  <link rel="apple-touch-icon" href="/card-rewards-tracker/apple-touch-icon.png">
+  <meta name="theme-color" content="#4f46e5">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Rewards">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f0f2f5;
+      --surface: #ffffff;
+      --border: #e0e4ea;
+      --text: #1a1d23;
+      --muted: #6b7280;
+      --accent: #4f46e5;
+      --accent-light: #ede9fe;
+      --danger: #ef4444;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --radius: 12px;
+      --shadow: 0 1px 4px rgba(0,0,0,0.07), 0 2px 8px rgba(0,0,0,0.05);
+      --shadow-lg: 0 8px 32px rgba(0,0,0,0.14);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    /* ── Header ─────────────────────────────────── */
+    header {
+      background: white;
+      border-bottom: 1px solid var(--border);
+      padding: 0.9rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      box-shadow: var(--shadow);
+    }
+
+    .logo {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: -0.01em;
+    }
+
+    /* ── Buttons ─────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      font-family: inherit;
+      transition: background 0.12s, opacity 0.12s;
+    }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-primary:hover { background: #4338ca; }
+    .btn-ghost { background: transparent; color: var(--muted); }
+    .btn-ghost:hover { background: var(--bg); color: var(--text); }
+    .btn-sm { padding: 0.3rem 0.6rem; font-size: 0.8rem; border-radius: 6px; }
+    .btn-icon {
+      background: rgba(255,255,255,0.18);
+      border: none;
+      color: white;
+      border-radius: 6px;
+      width: 28px; height: 28px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
+      transition: background 0.12s;
+    }
+    .btn-icon:hover { background: rgba(255,255,255,0.32); }
+    .btn-icon-sm {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      color: var(--muted);
+      border-radius: 5px;
+      width: 24px; height: 24px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      transition: background 0.12s, color 0.12s;
+    }
+    .btn-icon-sm:hover { background: var(--bg); color: var(--danger); }
+
+    /* ── Main layout ─────────────────────────────── */
+    main {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 1.5rem;
+    }
+
+    /* ── Summary strip ───────────────────────────── */
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .stat {
+      background: white;
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      box-shadow: var(--shadow);
+    }
+    .stat-label { font-size: 0.78rem; color: var(--muted); margin-bottom: 0.2rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    .stat-value { font-size: 1.55rem; font-weight: 700; line-height: 1; }
+    .stat-value.blue   { color: var(--accent); }
+    .stat-value.green  { color: var(--success); }
+    .stat-value.amber  { color: var(--warning); }
+    .stat-value.purple { color: #9333ea; }
+
+    /* ── Cards grid ──────────────────────────────── */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 1.25rem;
+      align-items: start;
+    }
+
+    /* ── Card ────────────────────────────────────── */
+    .card-item {
+      background: white;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 1.1rem 1.25rem;
+      color: white;
+      position: relative;
+      min-height: 70px;
+    }
+    .card-header-actions {
+      position: absolute;
+      top: 0.7rem;
+      right: 0.75rem;
+      display: flex;
+      gap: 0.3rem;
+    }
+    .card-name { font-size: 1.05rem; font-weight: 700; padding-left: 1.2rem; }
+    .card-bank { font-size: 0.8rem; opacity: 0.82; margin-top: 0.1rem; padding-left: 1.2rem; }
+
+    .card-grip {
+      position: absolute;
+      top: 50%; left: 0.75rem;
+      transform: translateY(-50%);
+      color: rgba(255,255,255,0.4);
+      cursor: grab;
+      line-height: 0;
+      user-select: none;
+      transition: color 0.12s;
+    }
+    .card-grip:hover  { color: rgba(255,255,255,0.85); }
+    .card-grip:active { cursor: grabbing; }
+    .card-item.dragging   { opacity: 0.35; }
+    .card-item.drag-over  { outline: 2.5px solid var(--accent); outline-offset: -2px; }
+    .credit-item.dragging  { opacity: 0.35; }
+    .credit-item.drag-over { outline: 2px solid var(--accent); outline-offset: -2px; }
+    .credit-grip {
+      color: var(--border);
+      cursor: grab;
+      line-height: 0;
+      flex-shrink: 0;
+      transition: color 0.12s;
+    }
+    .credit-grip:hover  { color: var(--muted); }
+    .credit-grip:active { cursor: grabbing; }
+
+    /* ── Credits ─────────────────────────────────── */
+    .credits-body { padding: 0.85rem 1rem; }
+
+    .credit-item {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.8rem;
+      margin-bottom: 0.6rem;
+    }
+    .credit-item:last-of-type { margin-bottom: 0.6rem; }
+
+    .credit-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 0.5rem;
+    }
+    .credit-name { font-size: 0.875rem; font-weight: 600; }
+    .credit-right { display: flex; align-items: center; gap: 0.35rem; flex-shrink: 0; }
+
+    .badge {
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0.15rem 0.45rem;
+      border-radius: 999px;
+    }
+    .badge-monthly     { background: #dbeafe; color: #1d4ed8; }
+    .badge-annual      { background: #fef9c3; color: #92400e; }
+    .badge-quarterly   { background: #dcfce7; color: #166534; }
+    .badge-semi-annual { background: #fae8ff; color: #6b21a8; }
+
+    /* ── Progress bar ────────────────────────────── */
+    .progress-bar {
+      height: 7px;
+      background: var(--border);
+      border-radius: 999px;
+      overflow: hidden;
+      margin-bottom: 0.3rem;
+    }
+    .progress-fill {
+      height: 100%;
+      border-radius: 999px;
+      transition: width 0.35s ease;
+    }
+    .progress-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    .progress-labels .lbl-used { font-weight: 600; color: var(--text); }
+
+    .credit-foot {
+      margin-top: 0.55rem;
+      display: flex;
+      gap: 0.4rem;
+    }
+
+    /* ── Add credit button ───────────────────────── */
+    .add-credit-btn {
+      display: block;
+      width: 100%;
+      padding: 0.6rem;
+      text-align: center;
+      border: 1.5px dashed var(--border);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 0.83rem;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+    .add-credit-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-light);
+    }
+
+    /* ── Value bar ───────────────────────────────── */
+    .value-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.6rem 1rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.8rem;
+    }
+    .value-bar .fee    { color: var(--muted); }
+    .value-bar .net    { font-weight: 700; }
+    .value-bar .net.pos { color: var(--success); }
+    .value-bar .net.neg { color: var(--danger); }
+
+    /* ── No-credits placeholder ──────────────────── */
+    .no-credits {
+      text-align: center;
+      padding: 1rem 0 0.5rem;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    /* ── Empty state ─────────────────────────────── */
+    .empty-state {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 5rem 1rem;
+      color: var(--muted);
+    }
+    .empty-icon { font-size: 3rem; margin-bottom: 1rem; }
+    .empty-state h2 { font-size: 1.2rem; color: var(--text); margin-bottom: 0.4rem; }
+    .empty-state p  { font-size: 0.9rem; margin-bottom: 1.5rem; }
+
+    /* ── Modals ──────────────────────────────────── */
+    .backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.38);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .backdrop.open { display: flex; }
+
+    .modal {
+      background: white;
+      border-radius: var(--radius);
+      width: 100%;
+      max-width: 460px;
+      box-shadow: var(--shadow-lg);
+      display: flex;
+      flex-direction: column;
+      max-height: 90vh;
+    }
+
+    .modal-head {
+      padding: 1.1rem 1.4rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .modal-head h2 { font-size: 1.05rem; }
+
+    .modal-body {
+      padding: 1.25rem 1.4rem;
+      overflow-y: auto;
+    }
+
+    .modal-foot {
+      padding: 0.9rem 1.4rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.65rem;
+      flex-shrink: 0;
+    }
+
+    /* ── Forms ───────────────────────────────────── */
+    .fgroup { margin-bottom: 1rem; }
+    .fgroup:last-child { margin-bottom: 0; }
+    .frow { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+
+    label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 500;
+      margin-bottom: 0.3rem;
+      color: var(--text);
+    }
+
+    input[type=text],
+    input[type=number],
+    input[type=date],
+    select {
+      width: 100%;
+      padding: 0.55rem 0.75rem;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.875rem;
+      font-family: inherit;
+      color: var(--text);
+      background: white;
+      transition: border-color 0.12s;
+      appearance: auto;
+    }
+    input:focus, select:focus { outline: none; border-color: var(--accent); }
+
+    /* ── Color swatches ──────────────────────────── */
+    .color-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.4rem;
+    }
+    .swatch {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      cursor: pointer;
+      border: 3px solid transparent;
+      transition: transform 0.12s, border-color 0.12s;
+      flex-shrink: 0;
+    }
+    .swatch:hover  { transform: scale(1.12); }
+    .swatch.active { border-color: #1a1d23; transform: scale(1.12); }
+
+    /* ── Usage history ───────────────────────────── */
+    .usage-head {
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--muted);
+      margin: 1rem 0 0.4rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .usage-scroll {
+      max-height: 190px;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    .usage-entry {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.55rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.85rem;
+    }
+    .usage-entry:last-child { border-bottom: none; }
+    .usage-amt   { font-weight: 600; }
+    .usage-note  { font-size: 0.78rem; color: var(--muted); }
+    .usage-date  { font-size: 0.78rem; color: var(--muted); white-space: nowrap; margin-left: 0.5rem; }
+    .usage-empty { text-align: center; padding: 1rem; color: var(--muted); font-size: 0.85rem; }
+    .usage-oop   { font-size: 0.7rem; color: var(--muted); margin-left: 0.4rem; font-weight: 400; }
+
+    /* ── Scrollbar ───────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">&#x1F4B3; Card Rewards Tracker</div>
+  <button class="btn btn-primary" onclick="openCardModal()">+ Add Card</button>
+</header>
+
+<main>
+  <div class="summary" id="summary"></div>
+  <div class="cards-grid" id="grid"></div>
+</main>
+
+<!-- ── Card Modal ───────────────────────────────────────────────────────────── -->
+<div class="backdrop" id="cardModal" onclick="backdropClose(event,'cardModal')">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="cardModalTitle">Add Card</h2>
+      <button class="btn btn-ghost btn-sm" onclick="close('cardModal')">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <div class="fgroup">
+        <label>Card Name</label>
+        <input type="text" id="cName" placeholder="e.g. Sapphire Reserve">
+      </div>
+      <div class="fgroup">
+        <label>Bank / Issuer</label>
+        <input type="text" id="cBank" placeholder="e.g. Chase">
+      </div>
+      <div class="fgroup">
+        <label>Annual Fee ($) <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+        <input type="number" id="cFee" placeholder="0" min="0" step="0.01">
+      </div>
+      <div class="fgroup">
+        <label>Card Color</label>
+        <div class="color-grid" id="colorGrid"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="close('cardModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveCard()">Save Card</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Credit Modal ─────────────────────────────────────────────────────────── -->
+<div class="backdrop" id="creditModal" onclick="backdropClose(event,'creditModal')">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="creditModalTitle">Add Credit</h2>
+      <button class="btn btn-ghost btn-sm" onclick="close('creditModal')">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <div class="fgroup">
+        <label>Credit / Benefit Name</label>
+        <input type="text" id="crName" placeholder="e.g. Travel Credit">
+      </div>
+      <div class="frow">
+        <div class="fgroup">
+          <label>Total Amount ($)</label>
+          <input type="number" id="crAmount" placeholder="300" min="0.01" step="0.01">
+        </div>
+        <div class="fgroup">
+          <label>Reset Period</label>
+          <select id="crType" onchange="onTypeChange()">
+            <option value="annual">Annual</option>
+            <option value="semi-annual">Semi-Annual</option>
+            <option value="quarterly">Quarterly</option>
+            <option value="monthly">Monthly</option>
+          </select>
+        </div>
+      </div>
+      <div class="fgroup" id="monthGroup">
+        <label id="monthGroupLabel">Resets Each Year In</label>
+        <select id="crMonth">
+          <option value="1">January</option><option value="2">February</option>
+          <option value="3">March</option><option value="4">April</option>
+          <option value="5">May</option><option value="6">June</option>
+          <option value="7">July</option><option value="8">August</option>
+          <option value="9">September</option><option value="10">October</option>
+          <option value="11">November</option><option value="12">December</option>
+        </select>
+      </div>
+      <div class="fgroup" id="dayGroup" style="display:none">
+        <label>Resets on Day of Month</label>
+        <input type="number" id="crDay" min="1" max="28" value="1">
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="close('creditModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveCredit()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Usage Modal ──────────────────────────────────────────────────────────── -->
+<div class="backdrop" id="usageModal" onclick="backdropClose(event,'usageModal')">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="usageModalTitle">Log Usage</h2>
+      <button class="btn btn-ghost btn-sm" onclick="close('usageModal')">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <div class="frow">
+        <div class="fgroup">
+          <label>Amount Used ($)</label>
+          <input type="number" id="uAmount" placeholder="0.00" min="0.01" step="0.01">
+        </div>
+        <div class="fgroup">
+          <label>Date</label>
+          <input type="date" id="uDate">
+        </div>
+      </div>
+      <div class="fgroup">
+        <label>Note <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+        <input type="text" id="uNote" placeholder="e.g. Delta flight, Hulu subscription">
+      </div>
+      <div class="usage-head">Usage History</div>
+      <div class="usage-scroll" id="usageList"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="close('usageModal')">Done</button>
+      <button class="btn btn-primary" onclick="logUsage()">Log Usage</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Constants ───────────────────────────────────────────────────────────────
+const KEY = 'crt_v1';
+const PALETTE = [
+  // Blues & navies
+  '#0f3460','#16213e','#1e40af','#0369a1',
+  // Teals & cyans
+  '#0e7490','#164e63','#134e4a','#0f766e',
+  // Greens
+  '#065f46','#166534','#1b4332','#3f6212',
+  // Olive & lime
+  '#365314','#4d7c0f','#14532d','#1c4532',
+  // Reds & burgundy
+  '#7f1d1d','#9f1239','#5c0029','#9b1c1c',
+  // Pinks & rose
+  '#be185d','#9d174d','#831843','#701a75',
+  // Purples & violets
+  '#4c1d95','#312e81','#581c87','#6b21a8',
+  // Magentas
+  '#86198f','#7e22ce','#a21caf','#6d28d9',
+  // Warm oranges & browns
+  '#7b2d00','#7c2d12','#92400e','#78350f',
+  // Amber & copper
+  '#b45309','#a16207','#854d0e','#713f12',
+  // Charcoals & slates
+  '#1a1a2e','#1e293b','#374151','#334155',
+  // Dark neutrals
+  '#1f2937','#111827','#27272a','#292524',
+];
+const MONTHS = ['January','February','March','April','May','June',
+                'July','August','September','October','November','December'];
+
+// ── State ───────────────────────────────────────────────────────────────────
+let db = { cards: [] };
+let editCardId   = null;
+let editCrCardId = null;
+let editCrId     = null;
+let activeColor  = PALETTE[0];
+let uCtx          = null; // { cardId, crId } for usage modal
+let draggedCardId = null;
+let draggedCr     = null; // { cardId, crId }
+
+// ── Persistence ─────────────────────────────────────────────────────────────
+function loadDb() {
+  try { const r = localStorage.getItem(KEY); if (r) db = JSON.parse(r); } catch {}
+}
+function saveDb() { localStorage.setItem(KEY, JSON.stringify(db)); }
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function uid()  { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+function today(){ return new Date().toISOString().slice(0,10); }
+function fmt(n)  { return (n < 0 ? '-$' : '$') + Math.abs(+n).toFixed(2); }
+function fmtNet(n) { return (n >= 0 ? '+$' : '-$') + Math.abs(+n).toFixed(2); }
+function esc(s) {
+  return String(s||'')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function getCard(id) { return db.cards.find(c => c.id === id); }
+function getCr(card, id) { return (card.credits||[]).find(c => c.id === id); }
+
+// ── Period logic ─────────────────────────────────────────────────────────────
+function periodStart(cr) {
+  const now = new Date();
+
+  if (cr.type === 'monthly') {
+    const d = cr.renewalDay || 1;
+    let start = new Date(now.getFullYear(), now.getMonth(), d);
+    if (now < start) start = new Date(now.getFullYear(), now.getMonth() - 1, d);
+    return start;
+  }
+
+  // For annual / semi-annual / quarterly: walk back month-by-month from the
+  // current month until we land on one that aligns with the anchor + k*step.
+  const anchor = (cr.renewalMonth || 1) - 1; // 0-indexed
+  const step   = cr.type === 'quarterly' ? 3 : cr.type === 'semi-annual' ? 6 : 12;
+
+  let y = now.getFullYear();
+  let m = now.getMonth();
+  for (let i = 0; i < 24; i++) {
+    if (((m - anchor) % 12 + 12) % 12 % step === 0) return new Date(y, m, 1);
+    if (--m < 0) { m = 11; y--; }
+  }
+  return new Date(now.getFullYear() - 2, anchor, 1); // fallback
+}
+
+function periodUsages(cr) {
+  const start = periodStart(cr);
+  return (cr.usages || []).filter(u => new Date(u.date + 'T00:00:00') >= start);
+}
+
+function usedAmt(cr)  { return (cr.usages || []).reduce((s, u) => s + u.amount, 0); }
+function leftAmt(cr)  { return Math.max(0, cr.amount - usedAmt(cr)); }
+
+function barColor(pct) {
+  if (pct >= 0.999) return '#22c55e';
+  if (pct >= 0.65)  return '#f59e0b';
+  return '#4f46e5';
+}
+
+// ── Render ───────────────────────────────────────────────────────────────────
+function render() { renderSummary(); renderGrid(); }
+
+function renderSummary() {
+  const cards    = db.cards.length;
+  const total    = db.cards.flatMap(c=>c.credits).reduce((s,c)=>s+c.amount, 0);
+  const used     = db.cards.flatMap(c=>c.credits).reduce((s,c)=>s+usedAmt(c), 0);
+  const left     = total - used;
+  const fees     = db.cards.reduce((s,c)=>s+(c.annualFee||0), 0);
+  const netVal   = used - fees;
+  const netCls   = netVal >= 0 ? 'green' : 'danger';
+
+  document.getElementById('summary').innerHTML = `
+    <div class="stat"><div class="stat-label">Cards</div><div class="stat-value blue">${cards}</div></div>
+    <div class="stat"><div class="stat-label">Total Credits</div><div class="stat-value">${fmt(total)}</div></div>
+    <div class="stat"><div class="stat-label">Used</div><div class="stat-value amber">${fmt(used)}</div></div>
+    <div class="stat"><div class="stat-label">Remaining</div><div class="stat-value green">${fmt(left)}</div></div>
+    <div class="stat"><div class="stat-label">Net Value</div><div class="stat-value" style="color:var(--${netCls})">${fmtNet(netVal)}</div></div>
+  `;
+}
+
+function renderGrid() {
+  const grid = document.getElementById('grid');
+  if (db.cards.length === 0) {
+    grid.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">&#x1F4B3;</div>
+        <h2>No cards yet</h2>
+        <p>Add your first credit card to start tracking rewards and credits.</p>
+        <button class="btn btn-primary" onclick="openCardModal()">+ Add Card</button>
+      </div>`;
+    return;
+  }
+  grid.innerHTML = db.cards.map(card => `
+    <div class="card-item"
+         data-card-id="${card.id}"
+         draggable="true"
+         ondragstart="onDragStart(event,'${card.id}')"
+         ondragover="onDragOver(event,'${card.id}')"
+         ondrop="onDrop(event,'${card.id}')"
+         ondragend="onDragEnd()">
+      <div class="card-header" style="background:${card.color}">
+        <div class="card-grip" title="Drag to reorder">
+          <svg width="8" height="14" viewBox="0 0 8 14" fill="currentColor">
+            <circle cx="2" cy="2"  r="1.5"/><circle cx="6" cy="2"  r="1.5"/>
+            <circle cx="2" cy="7"  r="1.5"/><circle cx="6" cy="7"  r="1.5"/>
+            <circle cx="2" cy="12" r="1.5"/><circle cx="6" cy="12" r="1.5"/>
+          </svg>
+        </div>
+        <div class="card-header-actions">
+          <button class="btn-icon" onclick="openCardModal('${card.id}')" title="Edit card">&#x270F;&#xFE0F;</button>
+          <button class="btn-icon" onclick="deleteCard('${card.id}')" title="Delete card">&#x1F5D1;&#xFE0F;</button>
+        </div>
+        <div class="card-name">${esc(card.name)}</div>
+        <div class="card-bank">${esc(card.bank)}</div>
+      </div>
+      <div class="credits-body">
+        ${renderCredits(card)}
+        <button class="add-credit-btn" onclick="openCrModal('${card.id}')">+ Add Credit / Benefit</button>
+      </div>
+      ${renderValueBar(card)}
+    </div>
+  `).join('');
+}
+
+function renderCredits(card) {
+  if (!card.credits || card.credits.length === 0) {
+    return `<div class="no-credits">No credits added yet.</div>`;
+  }
+  return card.credits.map(cr => {
+    const used = usedAmt(cr);
+    const pct  = Math.min(1, used / cr.amount);
+    const left = leftAmt(cr);
+    const color = barColor(pct);
+    const TYPE_META = {
+      'monthly':     ['Monthly',     'badge-monthly'],
+      'quarterly':   ['Quarterly',   'badge-quarterly'],
+      'semi-annual': ['Semi-Annual', 'badge-semi-annual'],
+      'annual':      ['Annual',      'badge-annual'],
+    };
+    const [typeLabel, badgeCls] = TYPE_META[cr.type] || TYPE_META['annual'];
+    return `
+      <div class="credit-item"
+           data-cr-id="${cr.id}"
+           draggable="true"
+           ondragstart="onCrDragStart(event,'${card.id}','${cr.id}')"
+           ondragover="onCrDragOver(event,'${card.id}','${cr.id}')"
+           ondrop="onCrDrop(event,'${card.id}','${cr.id}')"
+           ondragend="onCrDragEnd()">
+        <div class="credit-row">
+          <div style="display:flex;align-items:center;gap:0.4rem;min-width:0">
+            <div class="credit-grip" title="Drag to reorder">
+              <svg width="6" height="10" viewBox="0 0 6 10" fill="currentColor">
+                <circle cx="1.5" cy="1.5" r="1.2"/><circle cx="4.5" cy="1.5" r="1.2"/>
+                <circle cx="1.5" cy="5"   r="1.2"/><circle cx="4.5" cy="5"   r="1.2"/>
+                <circle cx="1.5" cy="8.5" r="1.2"/><circle cx="4.5" cy="8.5" r="1.2"/>
+              </svg>
+            </div>
+            <div class="credit-name">${esc(cr.name)}</div>
+          </div>
+          <div class="credit-right">
+            <span class="badge ${badgeCls}">${typeLabel}</span>
+            <button class="btn-icon-sm" onclick="openCrModal('${card.id}','${cr.id}')" title="Edit">&#x270F;&#xFE0F;</button>
+            <button class="btn-icon-sm" onclick="deleteCr('${card.id}','${cr.id}')" title="Delete">&#x1F5D1;&#xFE0F;</button>
+          </div>
+        </div>  <!-- end credit-row -->
+        <div class="progress-bar">
+          <div class="progress-fill" style="width:${pct*100}%;background:${color}"></div>
+        </div>
+        <div class="progress-labels">
+          <span class="lbl-used">${fmt(used)} used</span>
+          <span>${fmt(left)} left of ${fmt(cr.amount)}</span>
+        </div>
+        <div class="credit-foot">
+          <button class="btn btn-primary btn-sm" onclick="openUsageModal('${card.id}','${cr.id}')">Log Use</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderValueBar(card) {
+  const fee    = card.annualFee || 0;
+  const used   = (card.credits || []).reduce((s, cr) => s + usedAmt(cr), 0);
+  const net    = used - fee;
+  const cls    = net >= 0 ? 'pos' : 'neg';
+  return `
+    <div class="value-bar">
+      <span class="fee">Annual fee: ${fmt(fee)}</span>
+      <span class="net ${cls}">Net value: ${fmtNet(net)}</span>
+    </div>`;
+}
+
+// ── Drag to reorder ───────────────────────────────────────────────────────────
+function onDragStart(e, cardId) {
+  if (e.target.closest('button')) { e.preventDefault(); return; }
+  draggedCardId = cardId;
+  e.dataTransfer.effectAllowed = 'move';
+  setTimeout(() => document.querySelector(`[data-card-id="${cardId}"]`)?.classList.add('dragging'), 0);
+}
+
+function onDragOver(e, cardId) {
+  e.preventDefault();
+  if (cardId === draggedCardId) return;
+  document.querySelectorAll('.card-item').forEach(el => el.classList.remove('drag-over'));
+  document.querySelector(`[data-card-id="${cardId}"]`)?.classList.add('drag-over');
+}
+
+function onDrop(e, cardId) {
+  e.preventDefault();
+  if (!draggedCardId || cardId === draggedCardId) return;
+  const from = db.cards.findIndex(c => c.id === draggedCardId);
+  const to   = db.cards.findIndex(c => c.id === cardId);
+  if (from < 0 || to < 0) return;
+  db.cards.splice(to, 0, db.cards.splice(from, 1)[0]);
+  saveDb(); render();
+  draggedCardId = null;
+}
+
+function onDragEnd() {
+  draggedCardId = null;
+  document.querySelectorAll('.card-item').forEach(el => el.classList.remove('dragging', 'drag-over'));
+}
+
+function onCrDragStart(e, cardId, crId) {
+  if (e.target.closest('button')) { e.preventDefault(); return; }
+  e.stopPropagation(); // don't trigger card drag
+  draggedCr = { cardId, crId };
+  e.dataTransfer.effectAllowed = 'move';
+  setTimeout(() => document.querySelector(`[data-cr-id="${crId}"]`)?.classList.add('dragging'), 0);
+}
+
+function onCrDragOver(e, cardId, crId) {
+  e.preventDefault();
+  e.stopPropagation();
+  if (!draggedCr || draggedCr.cardId !== cardId || crId === draggedCr.crId) return;
+  document.querySelectorAll('.credit-item').forEach(el => el.classList.remove('drag-over'));
+  document.querySelector(`[data-cr-id="${crId}"]`)?.classList.add('drag-over');
+}
+
+function onCrDrop(e, cardId, crId) {
+  e.preventDefault();
+  e.stopPropagation();
+  if (!draggedCr || draggedCr.cardId !== cardId || crId === draggedCr.crId) return;
+  const card = getCard(cardId);
+  const from = card.credits.findIndex(c => c.id === draggedCr.crId);
+  const to   = card.credits.findIndex(c => c.id === crId);
+  if (from < 0 || to < 0) return;
+  card.credits.splice(to, 0, card.credits.splice(from, 1)[0]);
+  saveDb(); render();
+  draggedCr = null;
+}
+
+function onCrDragEnd() {
+  draggedCr = null;
+  document.querySelectorAll('.credit-item').forEach(el => el.classList.remove('dragging', 'drag-over'));
+}
+
+// ── Color picker ─────────────────────────────────────────────────────────────
+function renderColors(selected) {
+  activeColor = selected || PALETTE[0];
+  document.getElementById('colorGrid').innerHTML = PALETTE.map(c => `
+    <div class="swatch ${c === activeColor ? 'active' : ''}"
+         data-color="${c}"
+         style="background:${c}"
+         onclick="pickColor('${c}')"></div>
+  `).join('');
+}
+function pickColor(c) {
+  activeColor = c;
+  document.querySelectorAll('.swatch').forEach(el => {
+    el.classList.toggle('active', el.dataset.color === c);
+  });
+}
+
+// ── Modal helpers ─────────────────────────────────────────────────────────────
+function open(id)  { document.getElementById(id).classList.add('open'); }
+function close(id) { document.getElementById(id).classList.remove('open'); }
+function backdropClose(e, id) { if (e.target === e.currentTarget) close(id); }
+
+// ── Card CRUD ─────────────────────────────────────────────────────────────────
+function openCardModal(id) {
+  editCardId = id || null;
+  const card = id ? getCard(id) : null;
+  document.getElementById('cardModalTitle').textContent = card ? 'Edit Card' : 'Add Card';
+  document.getElementById('cName').value = card ? card.name : '';
+  document.getElementById('cBank').value = card ? card.bank : '';
+  document.getElementById('cFee').value  = card ? (card.annualFee || '') : '';
+  renderColors(card ? card.color : PALETTE[0]);
+  open('cardModal');
+  setTimeout(() => document.getElementById('cName').focus(), 50);
+}
+
+function saveCard() {
+  const name      = document.getElementById('cName').value.trim();
+  const bank      = document.getElementById('cBank').value.trim();
+  const annualFee = parseFloat(document.getElementById('cFee').value) || 0;
+  if (!name) { alert('Card name is required.'); return; }
+
+  if (editCardId) {
+    const card     = getCard(editCardId);
+    card.name      = name;
+    card.bank      = bank;
+    card.color     = activeColor;
+    card.annualFee = annualFee;
+  } else {
+    db.cards.push({ id: uid(), name, bank, color: activeColor, annualFee, credits: [] });
+  }
+  saveDb(); render(); close('cardModal');
+}
+
+function deleteCard(id) {
+  if (!confirm('Delete this card and all its credits?')) return;
+  db.cards = db.cards.filter(c => c.id !== id);
+  saveDb(); render();
+}
+
+// ── Credit CRUD ───────────────────────────────────────────────────────────────
+function openCrModal(cardId, crId) {
+  editCrCardId = cardId;
+  editCrId     = crId || null;
+  const card   = getCard(cardId);
+  const cr     = crId ? getCr(card, crId) : null;
+
+  document.getElementById('creditModalTitle').textContent = cr ? 'Edit Credit' : 'Add Credit';
+  document.getElementById('crName').value   = cr ? cr.name   : '';
+  document.getElementById('crAmount').value = cr ? cr.amount : '';
+  document.getElementById('crType').value   = cr ? cr.type   : 'annual';
+  document.getElementById('crMonth').value  = cr ? (cr.renewalMonth || 1) : (new Date().getMonth() + 1);
+  document.getElementById('crDay').value    = cr ? (cr.renewalDay   || 1) : 1;
+  onTypeChange();
+  open('creditModal');
+  setTimeout(() => document.getElementById('crName').focus(), 50);
+}
+
+function onTypeChange() {
+  const type = document.getElementById('crType').value;
+  const isMonthly = type === 'monthly';
+  document.getElementById('monthGroup').style.display = isMonthly ? 'none' : '';
+  document.getElementById('dayGroup').style.display   = isMonthly ? '' : 'none';
+  const labels = {
+    'annual':      'Resets Each Year In',
+    'semi-annual': 'First Period Starts In',
+    'quarterly':   'First Quarter Starts In',
+  };
+  document.getElementById('monthGroupLabel').textContent = labels[type] || '';
+}
+
+function saveCredit() {
+  const name   = document.getElementById('crName').value.trim();
+  const amount = parseFloat(document.getElementById('crAmount').value);
+  const type   = document.getElementById('crType').value;
+  const month  = parseInt(document.getElementById('crMonth').value);
+  const day    = parseInt(document.getElementById('crDay').value);
+
+  if (!name)              { alert('Credit name is required.'); return; }
+  if (!amount || amount <= 0) { alert('Enter a valid amount.'); return; }
+
+  const card = getCard(editCrCardId);
+  if (editCrId) {
+    const cr       = getCr(card, editCrId);
+    cr.name        = name;
+    cr.amount      = amount;
+    cr.type        = type;
+    cr.renewalMonth = month;
+    cr.renewalDay  = day;
+  } else {
+    card.credits.push({ id: uid(), name, amount, type, renewalMonth: month, renewalDay: day, usages: [] });
+  }
+  saveDb(); render(); close('creditModal');
+}
+
+function deleteCr(cardId, crId) {
+  if (!confirm('Delete this credit?')) return;
+  const card = getCard(cardId);
+  card.credits = card.credits.filter(c => c.id !== crId);
+  saveDb(); render();
+}
+
+// ── Usage ─────────────────────────────────────────────────────────────────────
+function openUsageModal(cardId, crId) {
+  uCtx = { cardId, crId };
+  const card = getCard(cardId);
+  const cr   = getCr(card, crId);
+  document.getElementById('usageModalTitle').textContent = `Log Use — ${cr.name}`;
+  document.getElementById('uAmount').value = '';
+  document.getElementById('uDate').value   = new Date().getFullYear() + '-01-01';
+  document.getElementById('uNote').value   = '';
+  renderUsageList(cr);
+  open('usageModal');
+  setTimeout(() => document.getElementById('uAmount').focus(), 50);
+}
+
+function renderUsageList(cr) {
+  const all     = (cr.usages || []).slice().sort((a, b) => b.date.localeCompare(a.date));
+  const inPeriod = new Set(periodUsages(cr).map(u => u.id));
+  document.getElementById('usageList').innerHTML = all.length === 0
+    ? '<div class="usage-empty">No usage logged yet</div>'
+    : all.map(u => {
+        const oop = !inPeriod.has(u.id);
+        return `
+        <div class="usage-entry" style="${oop ? 'opacity:0.55' : ''}">
+          <div>
+            <div class="usage-amt">
+              ${fmt(u.amount)}
+              ${oop ? '<span class="usage-oop">out of period</span>' : ''}
+            </div>
+            ${u.note ? `<div class="usage-note">${esc(u.note)}</div>` : ''}
+          </div>
+          <div style="display:flex;align-items:center;gap:0.4rem">
+            <span class="usage-date">${u.date}</span>
+            <button class="btn-icon-sm" onclick="deleteUsage('${u.id}')" title="Remove">&#x1F5D1;&#xFE0F;</button>
+          </div>
+        </div>`;
+      }).join('');
+}
+
+function logUsage() {
+  const amount = parseFloat(document.getElementById('uAmount').value);
+  const date   = document.getElementById('uDate').value;
+  const note   = document.getElementById('uNote').value.trim();
+
+  if (!amount || amount <= 0) { alert('Enter a valid amount.'); return; }
+  if (!date)                  { alert('Enter a date.'); return; }
+
+  const card = getCard(uCtx.cardId);
+  const cr   = getCr(card, uCtx.crId);
+  cr.usages.push({ id: uid(), amount, date, note });
+
+  saveDb();
+  render();
+  document.getElementById('uAmount').value = '';
+  document.getElementById('uNote').value   = '';
+  renderUsageList(cr);
+}
+
+function deleteUsage(usageId) {
+  const card = getCard(uCtx.cardId);
+  const cr   = getCr(card, uCtx.crId);
+  cr.usages  = cr.usages.filter(u => u.id !== usageId);
+  saveDb(); render(); renderUsageList(cr);
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+loadDb();
+render();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('/card-rewards-tracker/sw.js'));
+}
+</script>
+</body>
+</html>
