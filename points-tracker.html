@@ -329,6 +329,15 @@
     .swatch:hover { transform: scale(1.12); }
     .swatch.active { border-color: #1a1d23; transform: scale(1.12); }
 
+    /* ── Drag-to-reorder shared styles ── */
+    .drag-grip {
+      cursor: grab; color: var(--muted); flex-shrink: 0;
+      padding: 0 0.4rem 0 0; opacity: 0.45; touch-action: none;
+    }
+    .drag-grip:active { cursor: grabbing; }
+    .cm-card-item.dragging, .cat-list-item.dragging { opacity: 0.4; }
+    .cm-card-item.drag-over, .cat-list-item.drag-over { border-color: var(--accent); background: var(--accent-light); }
+
     /* ── Card category-multiplier UI inside Manage Cards modal ── */
     .cm-card-item {
       border: 1px solid var(--border);
@@ -1106,9 +1115,16 @@ function renderCardList() {
 
     const base = c.baseMultiplier ?? 1;
     return `
-      <div class="cm-card-item">
+      <div class="cm-card-item" data-card-id="${c.id}" draggable="true"
+           ondragstart="onMgCardDragStart(event,'${c.id}')"
+           ondragover="onMgCardDragOver(event,'${c.id}')"
+           ondrop="onMgCardDrop(event,'${c.id}')"
+           ondragend="onMgCardDragEnd()">
         <div class="cm-card-top">
           <div class="cm-card-top-left">
+            <span class="drag-grip" title="Drag to reorder">
+              <svg width="6" height="10" viewBox="0 0 6 10" fill="currentColor"><circle cx="1.5" cy="1.5" r="1.5"/><circle cx="4.5" cy="1.5" r="1.5"/><circle cx="1.5" cy="5" r="1.5"/><circle cx="4.5" cy="5" r="1.5"/><circle cx="1.5" cy="8.5" r="1.5"/><circle cx="4.5" cy="8.5" r="1.5"/></svg>
+            </span>
             <div class="list-swatch" style="background:${c.color}"></div>
             <div>
               <div class="list-name">${esc(c.name)}</div>
@@ -1366,8 +1382,15 @@ function renderCategoryList() {
     }
 
     return `
-      <div class="cat-list-item">
+      <div class="cat-list-item" data-cat-name="${esc(cat.name)}" draggable="true"
+           ondragstart="onCatDragStart(event,'${esc(cat.name)}')"
+           ondragover="onCatDragOver(event,'${esc(cat.name)}')"
+           ondrop="onCatDrop(event,'${esc(cat.name)}')"
+           ondragend="onCatDragEnd()">
         <div class="cat-list-left">
+          <span class="drag-grip" title="Drag to reorder">
+            <svg width="6" height="10" viewBox="0 0 6 10" fill="currentColor"><circle cx="1.5" cy="1.5" r="1.5"/><circle cx="4.5" cy="1.5" r="1.5"/><circle cx="1.5" cy="5" r="1.5"/><circle cx="4.5" cy="5" r="1.5"/><circle cx="1.5" cy="8.5" r="1.5"/><circle cx="4.5" cy="8.5" r="1.5"/></svg>
+          </span>
           <span class="cat-preview" style="background:${style.bg};color:${style.fg}">${esc(cat.name)}</span>
         </div>
         <div class="cat-list-actions">
@@ -1385,6 +1408,64 @@ function renderCategoryList() {
     const cat = db.categories.find(c => c.name === editingCatName);
     if (cat) renderColorGrid('catEditColorGrid', cat.color, 'catEdit');
   }
+}
+
+// ── Drag-to-reorder: Manage Cards modal ───────────────────────────────────────
+let draggedMgCardId = null;
+
+function onMgCardDragStart(e, cardId) {
+  if (e.target.closest('button, input, select')) { e.preventDefault(); return; }
+  draggedMgCardId = cardId;
+  e.dataTransfer.effectAllowed = 'move';
+  setTimeout(() => e.target.closest('.cm-card-item')?.classList.add('dragging'), 0);
+}
+function onMgCardDragOver(e, cardId) {
+  e.preventDefault();
+  if (cardId === draggedMgCardId) return;
+  document.querySelectorAll('.cm-card-item').forEach(el => el.classList.remove('drag-over'));
+  document.querySelector(`.cm-card-item[data-card-id="${cardId}"]`)?.classList.add('drag-over');
+}
+function onMgCardDrop(e, targetId) {
+  e.preventDefault();
+  if (!draggedMgCardId || draggedMgCardId === targetId) return;
+  const from = db.cards.findIndex(c => c.id === draggedMgCardId);
+  const to   = db.cards.findIndex(c => c.id === targetId);
+  if (from < 0 || to < 0) return;
+  db.cards.splice(to, 0, db.cards.splice(from, 1)[0]);
+  save(); renderCardList();
+}
+function onMgCardDragEnd() {
+  draggedMgCardId = null;
+  document.querySelectorAll('.cm-card-item').forEach(el => el.classList.remove('dragging', 'drag-over'));
+}
+
+// ── Drag-to-reorder: Categories modal ─────────────────────────────────────────
+let draggedCatName = null;
+
+function onCatDragStart(e, name) {
+  if (e.target.closest('button, input')) { e.preventDefault(); return; }
+  draggedCatName = name;
+  e.dataTransfer.effectAllowed = 'move';
+  setTimeout(() => e.target.closest('.cat-list-item')?.classList.add('dragging'), 0);
+}
+function onCatDragOver(e, name) {
+  e.preventDefault();
+  if (name === draggedCatName) return;
+  document.querySelectorAll('.cat-list-item').forEach(el => el.classList.remove('drag-over'));
+  document.querySelector(`.cat-list-item[data-cat-name="${name}"]`)?.classList.add('drag-over');
+}
+function onCatDrop(e, targetName) {
+  e.preventDefault();
+  if (!draggedCatName || draggedCatName === targetName) return;
+  const from = db.categories.findIndex(c => c.name === draggedCatName);
+  const to   = db.categories.findIndex(c => c.name === targetName);
+  if (from < 0 || to < 0) return;
+  db.categories.splice(to, 0, db.categories.splice(from, 1)[0]);
+  saveDb(); renderCategoryList();
+}
+function onCatDragEnd() {
+  draggedCatName = null;
+  document.querySelectorAll('.cat-list-item').forEach(el => el.classList.remove('dragging', 'drag-over'));
 }
 
 function startEditCategory(name) {
