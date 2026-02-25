@@ -603,7 +603,8 @@ let db = {
     monthlyDay: 1,
     startingBalance: 0
   },
-  overrides: {} // key: "billId:YYYY-MM" → amount
+  overrides: {},   // key: "billId:YYYY-MM" → amount
+  payOverrides: {} // key: "pay:YYYY-MM-DD" → amount
 };
 
 let editBillId = null;
@@ -611,7 +612,7 @@ let activeColor = PALETTE[0];
 let currentYear  = new Date().getFullYear();
 let currentMonth = new Date().getMonth(); // 0-indexed
 let activeTab = 'tally';
-let overrideCtx = null; // { billId, monthKey }
+let overrideCtx = null; // { type:'bill'|'pay'|'balance', billId?, monthKey?, dateKey? }
 
 // ── Persistence ─────────────────────────────────────────────────────────────
 function loadDb() {
@@ -624,6 +625,7 @@ function loadDb() {
   if (!db.income) db.income = { amount: 0, frequency: 'biweekly', nextPayDate: '', monthlyDay: 1, startingBalance: 0 };
   if (db.income.startingBalance == null) db.income.startingBalance = 0;
   if (!db.overrides) db.overrides = {};
+  if (!db.payOverrides) db.payOverrides = {};
   db.bills.forEach(b => {
     if (!b.category) b.category = 'Other';
     if (!b.color) b.color = PALETTE[0];
@@ -734,13 +736,18 @@ function buildTally(y, m) {
   // Add pay events
   const payDates = getPayDatesForMonth(y, m);
   payDates.forEach(pd => {
+    const dateKey = pd.toISOString().slice(0, 10);
+    const payAmt = db.payOverrides[`pay:${dateKey}`] != null
+      ? db.payOverrides[`pay:${dateKey}`]
+      : db.income.amount;
     events.push({
       day: pd.getDate(),
       type: 'payday',
       name: 'Payday',
-      amount: db.income.amount,
+      amount: payAmt,
       color: null,
-      billId: null
+      billId: null,
+      dateKey
     });
   });
 
@@ -782,9 +789,15 @@ function computeBalanceAtStartOfMonth(y, m) {
   const startMonth = 0; // January
 
   for (let mm = startMonth; mm < m; mm++) {
-    // Add income
+    // Add income (respecting per-payday overrides)
     const payDates = getPayDatesForMonth(y, mm);
-    bal += payDates.length * (db.income.amount || 0);
+    payDates.forEach(pd => {
+      const dk = pd.toISOString().slice(0, 10);
+      const payAmt = db.payOverrides[`pay:${dk}`] != null
+        ? db.payOverrides[`pay:${dk}`]
+        : (db.income.amount || 0);
+      bal += payAmt;
+    });
 
     // Subtract bills
     db.bills.forEach(bill => {
@@ -807,7 +820,11 @@ function renderSummary() {
   const mk = monthKey(currentYear, currentMonth);
   const totalBills = db.bills.reduce((s, b) => s + billAmountForMonth(b, currentYear, currentMonth), 0);
   const payDates = getPayDatesForMonth(currentYear, currentMonth);
-  const totalIncome = payDates.length * (db.income.amount || 0);
+  const totalIncome = payDates.reduce((s, pd) => {
+    const dk = pd.toISOString().slice(0, 10);
+    const amt = db.payOverrides[`pay:${dk}`] != null ? db.payOverrides[`pay:${dk}`] : (db.income.amount || 0);
+    return s + amt;
+  }, 0);
   const netFlow = totalIncome - totalBills;
   const tally = buildTally(currentYear, currentMonth);
   const endBal = tally.length > 0 ? tally[tally.length - 1].balance : (db.income.startingBalance || 0);
@@ -851,16 +868,19 @@ function renderTally() {
     <td style="font-weight:600;color:var(--muted)">Starting Balance</td>
     <td class="r"></td>
     <td class="r"><span class="tally-balance ${startBal >= 0 ? 'positive' : 'negative'}">${fmtC(startBal)}</span></td>
-    <td></td>
+    <td><button class="btn-icon-sm" onclick="openBalanceEdit()" title="Edit starting balance">&#x270F;&#xFE0F;</button></td>
   </tr>`;
 
   rows.forEach(row => {
     const isPayday = row.type === 'payday';
     const amtClass = isPayday ? 'tally-payday' : 'tally-bill';
     const mk = monthKey(currentYear, currentMonth);
-    const editBtn = row.billId
-      ? `<button class="btn-icon-sm" onclick="openOverrideModal('${row.billId}','${mk}')" title="Edit amount for this month">&#x270F;&#xFE0F;</button>`
-      : '';
+    let editBtn = '';
+    if (row.billId) {
+      editBtn = `<button class="btn-icon-sm" onclick="openOverrideModal('${row.billId}','${mk}')" title="Edit amount for this month">&#x270F;&#xFE0F;</button>`;
+    } else if (row.type === 'payday' && row.dateKey) {
+      editBtn = `<button class="btn-icon-sm" onclick="openPayOverrideModal('${row.dateKey}')" title="Edit payday amount">&#x270F;&#xFE0F;</button>`;
+    }
 
     html += `<tr class="tally-row ${isPayday ? 'is-payday' : ''}">
       <td><span class="day-badge">${row.day}</span></td>
@@ -1052,14 +1072,44 @@ function saveIncome() {
 function openOverrideModal(billId, mk) {
   const bill = db.bills.find(b => b.id === billId);
   if (!bill) return;
-  overrideCtx = { billId, monthKey: mk };
+  overrideCtx = { type: 'bill', billId, monthKey: mk };
   const overrideKey = `${billId}:${mk}`;
   const currentAmt = db.overrides[overrideKey] != null ? db.overrides[overrideKey] : bill.amount;
 
   document.getElementById('overrideModalTitle').textContent = `Edit — ${bill.name}`;
   document.getElementById('overrideLabel').textContent = `Amount for ${MONTHS[currentMonth]} ${currentYear}`;
   document.getElementById('oAmount').value = currentAmt;
+  document.getElementById('overrideHint').textContent = 'Leave at 0 to skip this bill for the month. This only affects the selected month.';
   document.getElementById('overrideResetBtn').style.display = db.overrides[overrideKey] != null ? '' : 'none';
+  openModal('overrideModal');
+  setTimeout(() => document.getElementById('oAmount').focus(), 50);
+}
+
+// ── Override (per-payday amount) ────────────────────────────────────────────
+function openPayOverrideModal(dateKey) {
+  overrideCtx = { type: 'pay', dateKey };
+  const payKey = `pay:${dateKey}`;
+  const currentAmt = db.payOverrides[payKey] != null ? db.payOverrides[payKey] : db.income.amount;
+  const d = new Date(dateKey + 'T00:00:00');
+  const label = `${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+
+  document.getElementById('overrideModalTitle').textContent = `Edit Payday`;
+  document.getElementById('overrideLabel').textContent = `Pay amount for ${label}`;
+  document.getElementById('oAmount').value = currentAmt;
+  document.getElementById('overrideHint').textContent = 'Set to 0 to skip this payday. This only affects this specific pay date.';
+  document.getElementById('overrideResetBtn').style.display = db.payOverrides[payKey] != null ? '' : 'none';
+  openModal('overrideModal');
+  setTimeout(() => document.getElementById('oAmount').focus(), 50);
+}
+
+// ── Edit starting balance ───────────────────────────────────────────────────
+function openBalanceEdit() {
+  overrideCtx = { type: 'balance' };
+  document.getElementById('overrideModalTitle').textContent = 'Edit Starting Balance';
+  document.getElementById('overrideLabel').textContent = 'Balance at the start of January ' + currentYear;
+  document.getElementById('oAmount').value = db.income.startingBalance || 0;
+  document.getElementById('overrideHint').textContent = 'This is your cash on hand at the beginning of the year. All months are projected from this.';
+  document.getElementById('overrideResetBtn').style.display = 'none';
   openModal('overrideModal');
   setTimeout(() => document.getElementById('oAmount').focus(), 50);
 }
@@ -1067,13 +1117,27 @@ function openOverrideModal(billId, mk) {
 function saveOverride() {
   if (!overrideCtx) return;
   const amt = parseFloat(document.getElementById('oAmount').value) || 0;
-  db.overrides[`${overrideCtx.billId}:${overrideCtx.monthKey}`] = amt;
+
+  if (overrideCtx.type === 'bill') {
+    db.overrides[`${overrideCtx.billId}:${overrideCtx.monthKey}`] = amt;
+  } else if (overrideCtx.type === 'pay') {
+    db.payOverrides[`pay:${overrideCtx.dateKey}`] = amt;
+  } else if (overrideCtx.type === 'balance') {
+    db.income.startingBalance = amt;
+  }
+
   saveDb(); render(); closeModal('overrideModal');
 }
 
 function resetOverride() {
   if (!overrideCtx) return;
-  delete db.overrides[`${overrideCtx.billId}:${overrideCtx.monthKey}`];
+
+  if (overrideCtx.type === 'bill') {
+    delete db.overrides[`${overrideCtx.billId}:${overrideCtx.monthKey}`];
+  } else if (overrideCtx.type === 'pay') {
+    delete db.payOverrides[`pay:${overrideCtx.dateKey}`];
+  }
+
   saveDb(); render(); closeModal('overrideModal');
 }
 
