@@ -451,8 +451,13 @@
 
 <header>
   <div class="logo">&#x1F4B3; Card Rewards Tracker</div>
-  <button class="btn btn-primary" onclick="openCardModal()">+ Add Card</button>
+  <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
+    <button class="btn btn-ghost btn-sm" onclick="exportData()" title="Export data">📤 Export</button>
+    <button class="btn btn-ghost btn-sm" onclick="document.getElementById('importFile').click()" title="Import data">📥 Import</button>
+    <button class="btn btn-primary" onclick="openCardModal()">+ Add Card</button>
+  </div>
 </header>
+<input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(this)">
 
 <main>
   <div class="summary" id="summary"></div>
@@ -1065,6 +1070,40 @@ function deleteUsage(usageId) {
   const cr   = getCr(card, uCtx.crId);
   cr.usages  = cr.usages.filter(u => u.id !== usageId);
   saveDb(); render(); renderUsageList(cr);
+}
+
+// ── Export / Import ──────────────────────────────────────────────────────────
+function exportData() {
+  const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const date = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `card-rewards-tracker-backup-${date}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importData(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!Array.isArray(data.cards)) {
+        alert('Invalid file — expected Card Rewards Tracker data with cards.');
+        return;
+      }
+      if (!confirm('This will replace all current data. Continue?')) return;
+      localStorage.setItem(KEY, JSON.stringify(data));
+      location.reload();
+    } catch (err) {
+      alert('Could not read file: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  input.value = '';
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
